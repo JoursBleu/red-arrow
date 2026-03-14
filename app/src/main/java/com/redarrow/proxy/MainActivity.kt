@@ -6,14 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.OpenableColumns
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.redarrow.proxy.databinding.ActivityMainBinding
 import com.redarrow.proxy.model.ConnectionConfig
@@ -31,6 +32,10 @@ class MainActivity : AppCompatActivity() {
     private var tunnelService: TunnelService? = null
     private var serviceBound = false
 
+    // 已选择的私钥内容（从文件读取）
+    private var selectedKeyContent: String = ""
+    private var selectedKeyFileName: String = ""
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             tunnelService = (binder as TunnelService.TunnelBinder).getService()
@@ -46,7 +51,14 @@ class MainActivity : AppCompatActivity() {
 
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* 不管结果如何都继续 */ }
+    ) { /* 不管结果都继续 */ }
+
+    // 文件选择器回调
+    private val keyFileLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { readKeyFile(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermission()
         loadSavedConfig()
         setupAuthToggle()
+        setupKeyFilePicker()
         setupConnectButton()
     }
 
@@ -76,7 +89,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -91,22 +104,80 @@ class MainActivity : AppCompatActivity() {
             etPort.setText(config.port.toString())
             etUsername.setText(config.username)
             etPassword.setText(config.password)
-            etPrivateKey.setText(config.privateKey)
+            etKeyPassphrase.setText(config.privateKeyPassphrase)
             etSocksPort.setText(config.socksPort.toString())
             etHttpPort.setText(config.httpPort.toString())
-            when (config.authMethod) {
-                ConnectionConfig.AuthMethod.PASSWORD -> chipPassword.isChecked = true
-                ConnectionConfig.AuthMethod.PUBLIC_KEY -> chipKey.isChecked = true
+        }
+        // 恢复已保存的私钥
+        selectedKeyContent = config.privateKey
+        selectedKeyFileName = config.privateKeyFileName
+        if (selectedKeyFileName.isNotBlank()) {
+            binding.tvKeyFileName.text = selectedKeyFileName
+        }
+        // 设置认证方式
+        when (config.authMethod) {
+            ConnectionConfig.AuthMethod.PASSWORD -> binding.btnAuthPassword.isChecked = true
+            ConnectionConfig.AuthMethod.PUBLIC_KEY -> binding.btnAuthKey.isChecked = true
+        }
+        updateAuthVisibility(config.authMethod == ConnectionConfig.AuthMethod.PUBLIC_KEY)
+    }
+
+    private fun setupAuthToggle() {
+        binding.toggleAuthMethod.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                updateAuthVisibility(checkedId == R.id.btnAuthKey)
             }
         }
     }
 
-    private fun setupAuthToggle() {
-        binding.chipGroupAuth.setOnCheckedStateChangeListener { _, checkedIds ->
-            val isKey = checkedIds.contains(R.id.chipKey)
-            binding.tilPassword.visibility = if (isKey) View.GONE else View.VISIBLE
-            binding.tilPrivateKey.visibility = if (isKey) View.VISIBLE else View.GONE
+    private fun updateAuthVisibility(isKey: Boolean) {
+        binding.layoutPassword.visibility = if (isKey) View.GONE else View.VISIBLE
+        binding.layoutKeyFile.visibility = if (isKey) View.VISIBLE else View.GONE
+    }
+
+    private fun setupKeyFilePicker() {
+        binding.btnSelectKey.setOnClickListener {
+            // 打开文件选择器，支持所有文件类型
+            keyFileLauncher.launch(arrayOf("*/*"))
         }
+    }
+
+    /**
+     * 读取用户选择的私钥文件
+     */
+    private fun readKeyFile(uri: Uri) {
+        try {
+            // 读取文件名
+            val fileName = getFileName(uri) ?: "unknown_key"
+            // 读取文件内容
+            val content = contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader().readText()
+            } ?: throw Exception("无法读取文件")
+
+            selectedKeyContent = content
+            selectedKeyFileName = fileName
+            binding.tvKeyFileName.text = fileName
+        } catch (e: Exception) {
+            binding.tvError.apply {
+                text = "读取私钥文件失败: ${e.message}"
+                visibility = View.VISIBLE
+            }
+        }
+    }
+
+    /**
+     * 从 URI 获取文件名
+     */
+    private fun getFileName(uri: Uri): String? {
+        // 先尝试从 ContentResolver 查询
+        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && cursor.moveToFirst()) {
+                return cursor.getString(nameIndex)
+            }
+        }
+        // fallback: 从 URI path 提取
+        return uri.lastPathSegment?.substringAfterLast('/')
     }
 
     private fun setupConnectButton() {
@@ -133,13 +204,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildConfig(): ConnectionConfig {
-        val isKey = binding.chipKey.isChecked
+        val isKey = binding.btnAuthKey.isChecked
         return ConnectionConfig(
             host = binding.etHost.text.toString().trim(),
             port = binding.etPort.text.toString().toIntOrNull() ?: 22,
             username = binding.etUsername.text.toString().trim(),
             password = if (!isKey) binding.etPassword.text.toString() else "",
-            privateKey = if (isKey) binding.etPrivateKey.text.toString() else "",
+            privateKey = if (isKey) selectedKeyContent else "",
+            privateKeyFileName = if (isKey) selectedKeyFileName else "",
+            privateKeyPassphrase = if (isKey) binding.etKeyPassphrase.text.toString() else "",
             authMethod = if (isKey) ConnectionConfig.AuthMethod.PUBLIC_KEY
                          else ConnectionConfig.AuthMethod.PASSWORD,
             socksPort = binding.etSocksPort.text.toString().toIntOrNull() ?: 1080,
@@ -210,11 +283,12 @@ class MainActivity : AppCompatActivity() {
             etPort.isEnabled = enabled
             etUsername.isEnabled = enabled
             etPassword.isEnabled = enabled
-            etPrivateKey.isEnabled = enabled
+            etKeyPassphrase.isEnabled = enabled
+            btnSelectKey.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
-            chipPassword.isEnabled = enabled
-            chipKey.isEnabled = enabled
+            btnAuthPassword.isEnabled = enabled
+            btnAuthKey.isEnabled = enabled
         }
     }
 }

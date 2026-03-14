@@ -8,7 +8,8 @@ data class ConnectionConfig(
     val port: Int = 22,
     val username: String = "",
     val password: String = "",
-    val privateKey: String = "",       // PEM 格式私钥内容
+    val privateKey: String = "",             // 私钥内容（从文件读取，支持 OpenSSH/PEM/PKCS8 等格式）
+    val privateKeyFileName: String = "",     // 私钥文件名（仅用于 UI 显示）
     val privateKeyPassphrase: String = "",
     val authMethod: AuthMethod = AuthMethod.PASSWORD,
     val socksPort: Int = 1080,         // 本地 SOCKS5 代理端口

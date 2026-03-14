@@ -17,6 +17,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             .putString("username", config.username)
             .putString("password", config.password)
             .putString("privateKey", config.privateKey)
+            .putString("privateKeyFileName", config.privateKeyFileName)
             .putString("privateKeyPassphrase", config.privateKeyPassphrase)
             .putString("authMethod", config.authMethod.name)
             .putInt("socksPort", config.socksPort)
@@ -32,6 +33,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             username = prefs.getString("username", "") ?: "",
             password = prefs.getString("password", "") ?: "",
             privateKey = prefs.getString("privateKey", "") ?: "",
+            privateKeyFileName = prefs.getString("privateKeyFileName", "") ?: "",
             privateKeyPassphrase = prefs.getString("privateKeyPassphrase", "") ?: "",
             authMethod = try {
                 ConnectionConfig.AuthMethod.valueOf(
