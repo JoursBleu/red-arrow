@@ -22,6 +22,7 @@ import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
+import com.redarrow.proxy.proxy.TrafficCounter
 import com.redarrow.proxy.ssh.KeyManager
 import com.redarrow.proxy.ssh.KeyStoreManager
 import com.redarrow.proxy.util.AppLog
@@ -327,6 +328,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
         lifecycleScope.launch {
+            TrafficCounter.snapshot.collectLatest { (bytesIn, bytesOut) ->
+                if (tunnelService?.state?.value?.isConnected == true) {
+                    binding.tvTraffic.visibility = View.VISIBLE
+                    binding.tvTraffic.text = "↑ ${formatBytes(bytesOut)}  ↓ ${formatBytes(bytesIn)}"
+                }
+            }
+        }
+        lifecycleScope.launch {
             AppLog.logs.collectLatest { lines ->
                 binding.tvLog.text = lines.joinToString("\n")
                 binding.scrollLog.post {
@@ -346,6 +355,7 @@ class MainActivity : AppCompatActivity() {
                     btnConnect.isEnabled = true
                     tvProxyInfo.visibility = View.GONE
                     tvUptime.text = ""
+                    tvTraffic.visibility = View.GONE
                     cardConnections.visibility = View.GONE
                     setFieldsEnabled(true)
                 }
@@ -379,6 +389,7 @@ class MainActivity : AppCompatActivity() {
                         visibility = View.VISIBLE
                     }
                     tvProxyInfo.visibility = View.GONE
+                    tvTraffic.visibility = View.GONE
                     cardConnections.visibility = View.GONE
                     setFieldsEnabled(true)
                 }
@@ -402,6 +413,15 @@ class MainActivity : AppCompatActivity() {
                         "$ip  \u2014  ${conns.size} conn"
                     }
             }
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "${bytes} B"
+            bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format("%.2f MB", bytes / (1024.0 * 1024))
+            else -> String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024))
         }
     }
 

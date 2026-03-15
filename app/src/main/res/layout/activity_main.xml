@@ -85,6 +85,17 @@
                         android:textSize="13sp"
                         android:fontFamily="monospace" />
                 </LinearLayout>
+
+                <!-- Traffic stats -->
+                <TextView
+                    android:id="@+id/tvTraffic"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="44dp"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp"
+                    android:fontFamily="monospace"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <!-- SSH Server Config Card -->

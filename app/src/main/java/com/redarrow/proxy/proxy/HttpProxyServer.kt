@@ -274,6 +274,7 @@ class HttpProxyServer(
                 if (n <= 0) break
                 clientOut.write(buf, 0, n)
                 clientOut.flush()
+                TrafficCounter.addIn(n.toLong())
             }
         } catch (_: IOException) {}
 
@@ -305,6 +306,7 @@ class HttpProxyServer(
     }
 
     private fun relay(from: InputStream, to: OutputStream, tag: String): Thread {
+        val isUpload = tag.contains("client->")
         return Thread({
             try {
                 val buf = ByteArray(BUFFER_SIZE)
@@ -313,6 +315,8 @@ class HttpProxyServer(
                     if (n <= 0) break
                     to.write(buf, 0, n)
                     to.flush()
+                    if (isUpload) TrafficCounter.addOut(n.toLong())
+                    else TrafficCounter.addIn(n.toLong())
                 }
             } catch (_: IOException) {
             } catch (_: SocketException) {

@@ -12,6 +12,7 @@ data class TunnelState(
     val bytesIn: Long = 0,
     val bytesOut: Long = 0,
     val connectedAt: Long = 0,
+    val uptimeTick: Long = 0,
 ) {
     enum class Status {
         DISCONNECTED,

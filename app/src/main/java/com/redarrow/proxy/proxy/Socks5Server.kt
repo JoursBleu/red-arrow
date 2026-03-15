@@ -221,6 +221,7 @@ class Socks5Server(
     }
 
     private fun relay(from: InputStream, to: OutputStream, tag: String): Thread {
+        val isUpload = tag.contains("client->")
         return Thread({
             try {
                 val buf = ByteArray(BUFFER_SIZE)
@@ -229,6 +230,8 @@ class Socks5Server(
                     if (n <= 0) break
                     to.write(buf, 0, n)
                     to.flush()
+                    if (isUpload) TrafficCounter.addOut(n.toLong())
+                    else TrafficCounter.addIn(n.toLong())
                 }
             } catch (_: IOException) {}
             catch (_: SocketException) {}
