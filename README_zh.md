@@ -116,4 +116,4 @@ KeyStoreManager（密钥存储）
 
 ## 许可证
 
-CC BY-NC-SA 4.0 — 仅限非商业使用，商业授权请联系作者。
+Apache License 2.0

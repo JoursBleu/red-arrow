@@ -37,4 +37,4 @@ Open an [issue](https://github.com/JoursBleu/red-arrow/issues/new?template=featu
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under CC BY-NC-SA 4.0.
+By contributing, you agree that your contributions will be licensed under the Apache License 2.0.

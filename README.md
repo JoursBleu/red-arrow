@@ -115,4 +115,4 @@ KeyStoreManager (Key Storage)
 
 ## License
 
-CC BY-NC-SA 4.0 — Non-commercial use. Contact the author for commercial licensing.
+Apache License 2.0
