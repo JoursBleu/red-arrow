@@ -20,6 +20,7 @@ import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import com.redarrow.proxy.databinding.ActivityMainBinding
 import com.redarrow.proxy.model.ConnectionConfig
+import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
 import com.redarrow.proxy.ui.MainViewModel
@@ -296,6 +297,11 @@ class MainActivity : AppCompatActivity() {
                 updateUI(state)
             }
         }
+        lifecycleScope.launch {
+            tunnelService?.connectionTracker?.activeConnections?.collectLatest { connections ->
+                updateConnectionsUI(connections)
+            }
+        }
     }
 
     private fun updateUI(state: TunnelState) {
@@ -308,6 +314,7 @@ class MainActivity : AppCompatActivity() {
                     btnConnect.isEnabled = true
                     tvProxyInfo.visibility = View.GONE
                     tvUptime.text = ""
+                    cardConnections.visibility = View.GONE
                     setFieldsEnabled(true)
                 }
                 TunnelState.Status.CONNECTING -> {
@@ -340,7 +347,24 @@ class MainActivity : AppCompatActivity() {
                         visibility = View.VISIBLE
                     }
                     tvProxyInfo.visibility = View.GONE
+                    cardConnections.visibility = View.GONE
                     setFieldsEnabled(true)
+                }
+            }
+        }
+    }
+
+    private fun updateConnectionsUI(connections: List<ProxyConnection>) {
+        binding.apply {
+            if (connections.isEmpty()) {
+                cardConnections.visibility = if (tunnelService?.state?.value?.isConnected == true) View.VISIBLE else View.GONE
+                tvConnections.text = getString(R.string.no_active_connections)
+                tvConnectionCount.text = ""
+            } else {
+                cardConnections.visibility = View.VISIBLE
+                tvConnectionCount.text = getString(R.string.connection_count, connections.size)
+                tvConnections.text = connections.joinToString("\n") { conn ->
+                    "${conn.protocol}  ${conn.clientIp} \u2192 ${conn.targetAddress}"
                 }
             }
         }

@@ -17,6 +17,7 @@ import com.redarrow.proxy.R
 import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.proxy.HttpProxyServer
+import com.redarrow.proxy.proxy.ConnectionTracker
 import com.redarrow.proxy.proxy.Socks5Server
 import com.redarrow.proxy.ssh.SshManager
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +44,7 @@ class TunnelService : Service() {
     private val binder = TunnelBinder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val sshManager = SshManager()
+    val connectionTracker = ConnectionTracker()
     private var socksServer: Socks5Server? = null
     private var httpProxyServer: HttpProxyServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -78,8 +80,8 @@ class TunnelService : Service() {
             result.fold(
                 onSuccess = {
                     try {
-                        socksServer = Socks5Server(sshManager, config.socksPort, config.proxyPassword).also { it.start() }
-                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort, config.proxyPassword).also { it.start() }
+                        socksServer = Socks5Server(sshManager, config.socksPort, config.proxyPassword, connectionTracker).also { it.start() }
+                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort, config.proxyPassword, connectionTracker).also { it.start() }
 
                         _state.value = TunnelState(
                             status = TunnelState.Status.CONNECTED,
@@ -117,6 +119,7 @@ class TunnelService : Service() {
         socksServer?.stop()
         httpProxyServer?.stop()
         sshManager.disconnect()
+        connectionTracker.clear()
         socksServer = null
         httpProxyServer = null
 

@@ -2,6 +2,7 @@ package com.redarrow.proxy.proxy
 
 import android.util.Base64
 import android.util.Log
+import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.ssh.SshManager
 import java.io.BufferedReader
 import java.io.IOException
@@ -18,12 +19,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * HTTP 代理服务器
  * 监听 0.0.0.0，支持 CONNECT (HTTPS) 和普通 HTTP 转发
- * 可选 Proxy-Authorization Basic 认证
+ * 可选 Proxy-Authorization Basic 认证，跟踪活跃连接
  */
 class HttpProxyServer(
     private val sshManager: SshManager,
     private val port: Int,
     private val proxyPassword: String = "",
+    private val tracker: ConnectionTracker? = null,
 ) {
     companion object {
         private const val TAG = "HttpProxy"
@@ -68,6 +70,7 @@ class HttpProxyServer(
     }
 
     private fun handleClient(client: Socket) {
+        var connId: String? = null
         try {
             client.soTimeout = 30000
             val input = client.getInputStream()
@@ -87,7 +90,6 @@ class HttpProxyServer(
             val method = parts[0].uppercase()
             val uri = parts[1]
 
-            // 读取所有 headers
             val headers = mutableListOf<String>()
             while (true) {
                 val line = reader.readLine() ?: break
@@ -95,28 +97,24 @@ class HttpProxyServer(
                 headers.add(line)
             }
 
-            // 鉴权检查
             if (requireAuth && !checkAuth(headers)) {
                 send407(client)
                 return
             }
 
             if (method == "CONNECT") {
-                handleConnect(client, uri, headers)
+                connId = handleConnect(client, uri, headers)
             } else {
-                handleHttp(client, method, uri, parts[2], headers, reader)
+                connId = handleHttp(client, method, uri, parts[2], headers, reader)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Client handler error", e)
         } finally {
+            connId?.let { tracker?.remove(it) }
             try { client.close() } catch (_: Exception) {}
         }
     }
 
-    /**
-     * 检查 Proxy-Authorization: Basic base64(user:password)
-     * 用户名任意，只检查密码部分
-     */
     private fun checkAuth(headers: List<String>): Boolean {
         val authHeader = headers.find {
             it.startsWith("Proxy-Authorization:", ignoreCase = true)
@@ -127,7 +125,6 @@ class HttpProxyServer(
 
         return try {
             val decoded = String(Base64.decode(value.substring(6), Base64.NO_WRAP))
-            // format: username:password
             val colonIdx = decoded.indexOf(':')
             if (colonIdx < 0) return false
             val clientPassword = decoded.substring(colonIdx + 1)
@@ -137,9 +134,6 @@ class HttpProxyServer(
         }
     }
 
-    /**
-     * 发送 407 Proxy Authentication Required
-     */
     private fun send407(client: Socket) {
         try {
             val body = "<html><body><h1>407 Proxy Authentication Required</h1></body></html>"
@@ -154,14 +148,26 @@ class HttpProxyServer(
         } catch (_: Exception) {}
     }
 
-    private fun handleConnect(client: Socket, hostPort: String, headers: List<String>) {
+    /**
+     * 返回 connId，调用方在 finally 里 remove
+     */
+    private fun handleConnect(client: Socket, hostPort: String, headers: List<String>): String? {
         val (host, port) = parseHostPort(hostPort, 443)
         Log.d(TAG, "CONNECT $host:$port")
+
+        val clientIp = client.inetAddress.hostAddress ?: "unknown"
+        val connId = tracker?.add(ProxyConnection(
+            clientIp = clientIp,
+            clientPort = client.port,
+            targetHost = host,
+            targetPort = port,
+            protocol = "HTTP"
+        ))
 
         val channel = sshManager.openDirectChannel(host, port)
         if (channel == null) {
             sendError(client, 502, "Bad Gateway - SSH channel failed")
-            return
+            return connId
         }
 
         try {
@@ -169,7 +175,7 @@ class HttpProxyServer(
         } catch (e: Exception) {
             Log.e(TAG, "Channel connect failed: $host:$port", e)
             sendError(client, 502, "Bad Gateway - Connection failed")
-            return
+            return connId
         }
 
         val output = client.getOutputStream()
@@ -186,6 +192,7 @@ class HttpProxyServer(
         try { t2.join() } catch (_: Exception) {}
 
         channel.disconnect()
+        return connId
     }
 
     private fun handleHttp(
@@ -195,7 +202,7 @@ class HttpProxyServer(
         httpVersion: String,
         headers: List<String>,
         reader: BufferedReader
-    ) {
+    ): String? {
         val url = if (uri.startsWith("http://")) uri else "http://$uri"
         val hostPortPath = url.removePrefix("http://")
         val slashIndex = hostPortPath.indexOf('/')
@@ -205,17 +212,26 @@ class HttpProxyServer(
         val (host, port) = parseHostPort(hostPort, 80)
         Log.d(TAG, "$method $host:$port$path")
 
+        val clientIp = client.inetAddress.hostAddress ?: "unknown"
+        val connId = tracker?.add(ProxyConnection(
+            clientIp = clientIp,
+            clientPort = client.port,
+            targetHost = host,
+            targetPort = port,
+            protocol = "HTTP"
+        ))
+
         val channel = sshManager.openDirectChannel(host, port)
         if (channel == null) {
             sendError(client, 502, "Bad Gateway")
-            return
+            return connId
         }
 
         try {
             channel.connect(10000)
         } catch (e: Exception) {
             sendError(client, 502, "Bad Gateway - Connection failed")
-            return
+            return connId
         }
 
         val remoteOut = channel.outputStream
@@ -260,6 +276,7 @@ class HttpProxyServer(
         } catch (_: IOException) {}
 
         channel.disconnect()
+        return connId
     }
 
     private fun parseHostPort(hostPort: String, defaultPort: Int): Pair<String, Int> {

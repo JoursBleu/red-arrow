@@ -32,6 +32,9 @@
     <string name="btn_retry">Retry</string>
 
     <!-- Log -->
+        <string name="active_connections">Active Connections</string>
+    <string name="no_active_connections">No active connections</string>
+    <string name="connection_count">%d connections</string>
     <string name="log_title">Log</string>
     <string name="btn_clear_log">Clear</string>
 

@@ -1,6 +1,7 @@
 package com.redarrow.proxy.proxy
 
 import android.util.Log
+import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.ssh.SshManager
 import java.io.IOException
 import java.io.InputStream
@@ -13,14 +14,14 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 本地 SOCKS5 代理服务器
- * 接收 SOCKS5 请求，通过 SSH 隧道转发
- * 监听 0.0.0.0，可选用户名/密码认证
+ * SOCKS5 代理服务器
+ * 监听 0.0.0.0，可选用户名/密码认证，跟踪活跃连接
  */
 class Socks5Server(
     private val sshManager: SshManager,
     private val port: Int,
     private val proxyPassword: String = "",
+    private val tracker: ConnectionTracker? = null,
 ) {
     companion object {
         private const val TAG = "Socks5Server"
@@ -39,7 +40,7 @@ class Socks5Server(
 
         executor = Executors.newCachedThreadPool()
         serverSocket = ServerSocket(port, 50, java.net.InetAddress.getByName("0.0.0.0"))
-        Log.i(TAG, "SOCKS5 server started on 0.0.0.0:$port (auth=${requireAuth})")
+        Log.i(TAG, "SOCKS5 server started on 0.0.0.0:$port")
 
         Thread({
             while (running.get()) {
@@ -65,18 +66,17 @@ class Socks5Server(
     }
 
     private fun handleClient(client: Socket) {
+        var connId: String? = null
         try {
             client.soTimeout = 30000
             val input = client.getInputStream()
             val output = client.getOutputStream()
 
-            // SOCKS5 握手 + 可选认证
             if (!doHandshake(input, output)) {
                 client.close()
                 return
             }
 
-            // 读取连接请求
             val request = readConnectRequest(input) ?: run {
                 sendReply(output, 0x01)
                 client.close()
@@ -84,6 +84,16 @@ class Socks5Server(
             }
 
             Log.d(TAG, "CONNECT ${request.host}:${request.port}")
+
+            // 注册连接
+            val clientIp = client.inetAddress.hostAddress ?: "unknown"
+            connId = tracker?.add(ProxyConnection(
+                clientIp = clientIp,
+                clientPort = client.port,
+                targetHost = request.host,
+                targetPort = request.port,
+                protocol = "SOCKS5"
+            ))
 
             val channel = sshManager.openDirectChannel(request.host, request.port)
             if (channel == null) {
@@ -116,15 +126,11 @@ class Socks5Server(
         } catch (e: Exception) {
             Log.e(TAG, "Client handler error", e)
         } finally {
+            connId?.let { tracker?.remove(it) }
             try { client.close() } catch (_: Exception) {}
         }
     }
 
-    /**
-     * SOCKS5 握手
-     * 如果设置了密码，要求 0x02 (USERNAME/PASSWORD) 认证
-     * 否则接受 0x00 (NO AUTH)
-     */
     private fun doHandshake(input: InputStream, output: OutputStream): Boolean {
         val version = input.read()
         if (version != 0x05) return false
@@ -134,23 +140,20 @@ class Socks5Server(
         input.readFully(methods)
 
         if (requireAuth) {
-            // 要求用户名/密码认证 (RFC 1929)
             if (!methods.contains(0x02.toByte())) {
-                output.write(byteArrayOf(0x05, 0xFF.toByte())) // no acceptable methods
+                output.write(byteArrayOf(0x05, 0xFF.toByte()))
                 output.flush()
                 return false
             }
             output.write(byteArrayOf(0x05, 0x02))
             output.flush()
 
-            // 读取用户名/密码子协商
-            val authVer = input.read() // 应该是 0x01
+            val authVer = input.read()
             if (authVer != 0x01) return false
 
             val uLen = input.read()
             val uBytes = ByteArray(uLen)
             input.readFully(uBytes)
-            // username 不检查，只检查 password
 
             val pLen = input.read()
             val pBytes = ByteArray(pLen)
@@ -158,15 +161,15 @@ class Socks5Server(
             val clientPassword = String(pBytes)
 
             if (clientPassword != proxyPassword) {
-                output.write(byteArrayOf(0x01, 0x01)) // auth failure
+                output.write(byteArrayOf(0x01, 0x01))
                 output.flush()
-                Log.w(TAG, "SOCKS5 auth failed from client")
+                Log.w(TAG, "SOCKS5 auth failed")
                 return false
             }
-            output.write(byteArrayOf(0x01, 0x00)) // auth success
+            output.write(byteArrayOf(0x01, 0x00))
             output.flush()
         } else {
-            output.write(byteArrayOf(0x05, 0x00)) // no auth required
+            output.write(byteArrayOf(0x05, 0x00))
             output.flush()
         }
         return true
@@ -179,7 +182,6 @@ class Socks5Server(
         val cmd = input.read()
         val rsv = input.read()
         val atyp = input.read()
-
         if (ver != 0x05 || cmd != 0x01) return null
 
         val host = when (atyp) {
@@ -203,19 +205,15 @@ class Socks5Server(
             }
             else -> return null
         }
-
         val portHigh = input.read()
         val portLow = input.read()
-        val port = (portHigh shl 8) or portLow
-
-        return ConnectRequest(host, port)
+        return ConnectRequest(host, (portHigh shl 8) or portLow)
     }
 
     private fun sendReply(output: OutputStream, status: Int) {
         output.write(byteArrayOf(
             0x05, status.toByte(), 0x00, 0x01,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00
         ))
         output.flush()
     }
@@ -230,9 +228,8 @@ class Socks5Server(
                     to.write(buf, 0, n)
                     to.flush()
                 }
-            } catch (_: IOException) {
-            } catch (_: SocketException) {
-            }
+            } catch (_: IOException) {}
+            catch (_: SocketException) {}
         }, "relay-$tag").also { it.isDaemon = true; it.start() }
     }
 

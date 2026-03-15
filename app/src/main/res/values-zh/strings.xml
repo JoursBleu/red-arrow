@@ -32,6 +32,9 @@
     <string name="btn_retry">重试</string>
 
     <!-- Log -->
+        <string name="active_connections">活跃连接</string>
+    <string name="no_active_connections">暂无活跃连接</string>
+    <string name="connection_count">%d 个连接</string>
     <string name="log_title">日志</string>
     <string name="btn_clear_log">清除</string>
 

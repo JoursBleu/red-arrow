@@ -509,6 +509,67 @@
             app:backgroundTint="@color/red_primary"
             app:cornerRadius="12dp" />
 
+        <!-- Active Connections Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardConnections"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/tvConnectionsTitle"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/active_connections"
+                        android:textColor="@color/red_accent"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvConnectionCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="200dp">
+
+                    <TextView
+                        android:id="@+id/tvConnections"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:text="@string/no_active_connections"
+                        android:textColor="?attr/colorOnSurface"
+                        android:textSize="12sp"
+                        android:lineSpacingExtra="4dp" />
+                </ScrollView>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Log Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
