@@ -119,6 +119,10 @@ KeyStoreManager (密钥存储 / Key Storage)
 └── SharedPreferences + JSON (私钥/公钥/密码 持久化 / private key, public key, passphrase persistence)
 ```
 
+## Buy Me a Coffee ☕
+
+`0x809EC3201f6bdFb3d428Ca7f0E10F3b55476a1c4` (ETH/ERC-20)
+
 ## License
 
 CC BY-NC-SA 4.0 — 非商业使用，商业授权请联系作者 / Non-commercial use, contact author for commercial license
