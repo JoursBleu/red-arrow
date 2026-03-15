@@ -329,9 +329,13 @@ class MainActivity : AppCompatActivity() {
             } else {
                 cardConnections.visibility = View.VISIBLE
                 tvConnectionCount.text = getString(R.string.connection_count, connections.size)
-                tvConnections.text = connections.joinToString("\n") { conn ->
-                    "${conn.protocol}  ${conn.clientIp} \u2192 ${conn.targetAddress}"
-                }
+                // 按 IP 分组统计连接数
+                val grouped = connections.groupBy { it.clientIp }
+                tvConnections.text = grouped.entries
+                    .sortedByDescending { it.value.size }
+                    .joinToString("\n") { (ip, conns) ->
+                        "$ip  \u2014  ${conns.size} conn"
+                    }
             }
         }
     }
