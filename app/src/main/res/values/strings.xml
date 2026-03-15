@@ -75,4 +75,21 @@
     <string name="error_no_key">No private key loaded</string>
     <string name="error_fill_server">Please fill in server info first</string>
     <string name="sending_pubkey">Sending public key…</string>
+    <string name="key_management">Key Management</string>
+    <string name="btn_add_key">+ Add</string>
+    <string name="no_keys">No keys stored. Tap + Add to create or import a key.</string>
+    <string name="btn_copy_pubkey">Copy</string>
+    <string name="btn_share_pubkey">Share</string>
+    <string name="btn_delete_key">Delete</string>
+    <string name="btn_manage_keys">Keys</string>
+    <string name="no_pubkey">No public key</string>
+    <string name="pubkey_copied">Public key copied</string>
+    <string name="confirm_delete_key">Delete this key?</string>
+    <string name="generate_ed25519">Generate Ed25519</string>
+    <string name="generate_rsa">Generate RSA (4096)</string>
+    <string name="import_from_file">Import from file</string>
+    <string name="hint_key_name">Key name</string>
+    <string name="key_name_title">Name this key</string>
+    <string name="key_imported">Key imported</string>
+    <string name="select_stored_key">Select stored key</string>
 </resources>

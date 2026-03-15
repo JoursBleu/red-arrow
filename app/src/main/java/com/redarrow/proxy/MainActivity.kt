@@ -24,7 +24,7 @@ import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
-import com.redarrow.proxy.ssh.KeyManager
+import com.redarrow.proxy.ssh.KeyStoreManager
 import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.ui.MainViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -171,80 +171,34 @@ class MainActivity : AppCompatActivity() {
             keyFileLauncher.launch(arrayOf("*/*"))
         }
 
-        binding.btnGenerateKey.setOnClickListener {
-            showGenerateKeyDialog()
+        binding.btnPickStoredKey.setOnClickListener {
+            showStoredKeyPicker()
         }
 
-        binding.btnSendPubKey.setOnClickListener {
-            sendPublicKeyToServer()
+        binding.btnManageKeys.setOnClickListener {
+            startActivity(Intent(this, KeysActivity::class.java))
         }
     }
 
-    private fun showGenerateKeyDialog() {
-        val types = arrayOf("Ed25519", "RSA (4096)")
+    private fun showStoredKeyPicker() {
+        val keyStore = KeyStoreManager(this)
+        val keys = keyStore.getAll()
+        if (keys.isEmpty()) {
+            Toast.makeText(this, getString(R.string.no_keys), Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, KeysActivity::class.java))
+            return
+        }
+        val names = keys.map { "${it.name} (${it.type})" }.toTypedArray()
         MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.key_type_title))
-            .setItems(types) { _, which ->
-                val passphrase = binding.etKeyPassphrase.text.toString()
-                try {
-                    val (privKey, pubKey) = when (which) {
-                        0 -> KeyManager.generateEd25519(passphrase)
-                        else -> KeyManager.generateRSA(passphrase)
-                    }
-                    selectedKeyContent = privKey
-                    selectedKeyFileName = if (which == 0) "ed25519_red-arrow" else "rsa_red-arrow"
-                    binding.tvKeyFileName.text = selectedKeyFileName
-                    Toast.makeText(this,
-                        getString(R.string.key_generated, selectedKeyFileName),
-                        Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    binding.tvError.apply {
-                        text = e.message
-                        visibility = View.VISIBLE
-                    }
-                }
+            .setTitle(getString(R.string.select_stored_key))
+            .setItems(names) { _, which ->
+                val key = keys[which]
+                selectedKeyContent = key.privateKey
+                selectedKeyFileName = key.name
+                binding.tvKeyFileName.text = key.name
+                Toast.makeText(this, key.name, Toast.LENGTH_SHORT).show()
             }
             .show()
-    }
-
-    private fun sendPublicKeyToServer() {
-        if (selectedKeyContent.isBlank()) {
-            Toast.makeText(this, getString(R.string.error_no_key), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val host = binding.etHost.text.toString().trim()
-        val username = binding.etUsername.text.toString().trim()
-        if (host.isBlank() || username.isBlank()) {
-            Toast.makeText(this, getString(R.string.error_fill_server), Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val config = buildConfig()
-        Toast.makeText(this, getString(R.string.sending_pubkey), Toast.LENGTH_SHORT).show()
-
-        lifecycleScope.launch {
-            try {
-                val passphrase = binding.etKeyPassphrase.text.toString()
-                val pubKey = KeyManager.extractPublicKey(selectedKeyContent, passphrase)
-                val result = KeyManager.sendPublicKey(config, pubKey)
-                result.fold(
-                    onSuccess = {
-                        Toast.makeText(this@MainActivity,
-                            getString(R.string.pubkey_sent), Toast.LENGTH_SHORT).show()
-                    },
-                    onFailure = { e ->
-                        Toast.makeText(this@MainActivity,
-                            getString(R.string.pubkey_send_failed, e.message),
-                            Toast.LENGTH_LONG).show()
-                    }
-                )
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity,
-                    getString(R.string.pubkey_send_failed, e.message),
-                    Toast.LENGTH_LONG).show()
-            }
-        }
     }
 
     private fun readKeyFile(uri: Uri) {
@@ -426,8 +380,8 @@ class MainActivity : AppCompatActivity() {
             etPassword.isEnabled = enabled
             etKeyPassphrase.isEnabled = enabled
             btnSelectKey.isEnabled = enabled
-            btnGenerateKey.isEnabled = enabled
-            btnSendPubKey.isEnabled = enabled
+            btnPickStoredKey.isEnabled = enabled
+            btnManageKeys.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
             etProxyUsername.isEnabled = enabled
