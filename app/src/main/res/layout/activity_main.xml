@@ -249,23 +249,6 @@
                                 android:singleLine="true" />
                         </LinearLayout>
 
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:hint="@string/hint_key_passphrase"
-                            app:boxBackgroundMode="outline"
-                            app:boxStrokeColor="@color/red_accent"
-                            app:endIconMode="password_toggle">
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etKeyPassphrase"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:textColor="?attr/colorOnSurface"
-                                android:inputType="textPassword"
-                                android:textSize="14sp" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/btnSendPubkey"
                             style="?attr/materialButtonOutlinedStyle"

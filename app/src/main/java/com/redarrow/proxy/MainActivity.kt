@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var selectedKeyContent: String = ""
     private var selectedKeyFileName: String = ""
     private var selectedKeyPublicKey: String = ""
+    private var selectedKeyPassphrase: String = ""
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -146,7 +147,6 @@ class MainActivity : AppCompatActivity() {
             etPort.setText(config.port.toString())
             etUsername.setText(config.username)
             etPassword.setText(config.password)
-            etKeyPassphrase.setText(config.privateKeyPassphrase)
             etSocksPort.setText(config.socksPort.toString())
             etHttpPort.setText(config.httpPort.toString())
             etProxyUsername.setText(config.proxyUsername)
@@ -160,6 +160,7 @@ class MainActivity : AppCompatActivity() {
             val keyStore = KeyStoreManager(this)
             val stored = keyStore.getAll().find { it.name == selectedKeyFileName }
             selectedKeyPublicKey = stored?.publicKey ?: ""
+            selectedKeyPassphrase = stored?.passphrase ?: ""
         }
         when (config.authMethod) {
             ConnectionConfig.AuthMethod.PASSWORD -> binding.btnAuthPassword.isChecked = true
@@ -203,6 +204,7 @@ class MainActivity : AppCompatActivity() {
                 selectedKeyContent = key.privateKey
                 selectedKeyFileName = key.name
                 selectedKeyPublicKey = key.publicKey
+                selectedKeyPassphrase = key.passphrase
                 binding.tvKeyFileName.text = key.name
                 Toast.makeText(this, key.name, Toast.LENGTH_SHORT).show()
             }
@@ -230,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     pubKey = KeyManager.extractPublicKey(
                         selectedKeyContent,
-                        binding.etKeyPassphrase.text.toString()
+                        selectedKeyPassphrase
                     )
                 } catch (e: Exception) {
                     Toast.makeText(this, getString(R.string.pubkey_send_failed, e.message), Toast.LENGTH_SHORT).show()
@@ -295,7 +297,7 @@ class MainActivity : AppCompatActivity() {
             password = if (!isKey) binding.etPassword.text.toString() else "",
             privateKey = if (isKey) selectedKeyContent else "",
             privateKeyFileName = if (isKey) selectedKeyFileName else "",
-            privateKeyPassphrase = if (isKey) binding.etKeyPassphrase.text.toString() else "",
+            privateKeyPassphrase = if (isKey) selectedKeyPassphrase else "",
             authMethod = if (isKey) ConnectionConfig.AuthMethod.PUBLIC_KEY
                          else ConnectionConfig.AuthMethod.PASSWORD,
             socksPort = binding.etSocksPort.text.toString().toIntOrNull() ?: 1080,
@@ -409,7 +411,6 @@ class MainActivity : AppCompatActivity() {
             etPort.isEnabled = enabled
             etUsername.isEnabled = enabled
             etPassword.isEnabled = enabled
-            etKeyPassphrase.isEnabled = enabled
             btnSelectKey.isEnabled = enabled
             btnSendPubkey.isEnabled = enabled
             etSocksPort.isEnabled = enabled

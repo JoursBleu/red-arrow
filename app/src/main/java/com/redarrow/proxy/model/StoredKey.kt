@@ -9,5 +9,6 @@ data class StoredKey(
     val type: String,                // "Ed25519" / "RSA" / "imported"
     val privateKey: String,          // 私钥内容
     val publicKey: String,           // 公钥内容
+    val passphrase: String = "",     // 私钥密码
     val createdAt: Long = System.currentTimeMillis(),
 )

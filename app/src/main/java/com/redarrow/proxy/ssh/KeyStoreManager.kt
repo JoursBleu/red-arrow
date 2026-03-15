@@ -10,6 +10,7 @@ import java.util.UUID
 /**
  * 密钥持久化存储管理器
  * 使用 SharedPreferences 存储密钥列表（JSON 序列化）
+ * 数据存储在应用内部目录，卸载时自动删除
  */
 class KeyStoreManager(context: Context) {
 
@@ -28,6 +29,7 @@ class KeyStoreManager(context: Context) {
                     type = o.optString("type", "unknown"),
                     privateKey = o.getString("privateKey"),
                     publicKey = o.optString("publicKey", ""),
+                    passphrase = o.optString("passphrase", ""),
                     createdAt = o.optLong("createdAt", 0),
                 )
             }
@@ -61,6 +63,7 @@ class KeyStoreManager(context: Context) {
             type = type,
             privateKey = priv,
             publicKey = pub,
+            passphrase = passphrase,
         )
         save(key)
         return key
@@ -75,6 +78,7 @@ class KeyStoreManager(context: Context) {
             type = "imported",
             privateKey = privateKeyContent,
             publicKey = pub,
+            passphrase = passphrase,
         )
         save(key)
         return key
@@ -89,6 +93,7 @@ class KeyStoreManager(context: Context) {
                 put("type", k.type)
                 put("privateKey", k.privateKey)
                 put("publicKey", k.publicKey)
+                put("passphrase", k.passphrase)
                 put("createdAt", k.createdAt)
             })
         }

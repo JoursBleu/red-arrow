@@ -59,7 +59,6 @@ class KeysActivity : AppCompatActivity() {
         tvEmpty.visibility = View.GONE
 
         val inflater = LayoutInflater.from(this)
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
         for (key in keys.sortedByDescending { it.createdAt }) {
             val view = inflater.inflate(R.layout.item_key, container, false)
@@ -119,27 +118,38 @@ class KeysActivity : AppCompatActivity() {
             .setTitle(getString(R.string.btn_add_key))
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> showNameInputDialog("Ed25519")
-                    1 -> showNameInputDialog("RSA")
+                    0 -> showGenerateDialog("Ed25519")
+                    1 -> showGenerateDialog("RSA")
                     2 -> importKeyLauncher.launch(arrayOf("*/*"))
                 }
             }
             .show()
     }
 
-    private fun showNameInputDialog(type: String) {
-        val input = EditText(this).apply {
+    private fun showGenerateDialog(type: String) {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(64, 32, 64, 16)
+        }
+        val etName = EditText(this).apply {
             hint = getString(R.string.hint_key_name)
             setText("${type.lowercase()}_${System.currentTimeMillis() / 1000}")
-            setPadding(64, 32, 64, 32)
         }
+        val etPassphrase = EditText(this).apply {
+            hint = getString(R.string.hint_key_passphrase)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        layout.addView(etName)
+        layout.addView(etPassphrase)
+
         MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.key_name_title))
-            .setView(input)
+            .setView(layout)
             .setPositiveButton(getString(R.string.btn_generate_key)) { _, _ ->
-                val name = input.text.toString().ifBlank { type.lowercase() }
+                val name = etName.text.toString().ifBlank { type.lowercase() }
+                val passphrase = etPassphrase.text.toString()
                 try {
-                    keyStore.generateAndSave(name, type)
+                    keyStore.generateAndSave(name, type, passphrase)
                     refreshList()
                     Toast.makeText(this, getString(R.string.key_generated, name),
                         Toast.LENGTH_SHORT).show()
@@ -159,18 +169,29 @@ class KeysActivity : AppCompatActivity() {
 
             val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "imported_key"
 
-            val input = EditText(this).apply {
+            val layout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(64, 32, 64, 16)
+            }
+            val etName = EditText(this).apply {
                 hint = getString(R.string.hint_key_name)
                 setText(fileName)
-                setPadding(64, 32, 64, 32)
             }
+            val etPassphrase = EditText(this).apply {
+                hint = getString(R.string.hint_key_passphrase)
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+            layout.addView(etName)
+            layout.addView(etPassphrase)
+
             MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.key_name_title))
-                .setView(input)
+                .setView(layout)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
-                    val name = input.text.toString().ifBlank { fileName }
+                    val name = etName.text.toString().ifBlank { fileName }
+                    val passphrase = etPassphrase.text.toString()
                     try {
-                        keyStore.importAndSave(name, content)
+                        keyStore.importAndSave(name, content, passphrase)
                         refreshList()
                         Toast.makeText(this, getString(R.string.key_imported),
                             Toast.LENGTH_SHORT).show()
