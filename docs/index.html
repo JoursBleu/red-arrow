@@ -86,6 +86,12 @@
         .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
         .btn-secondary:hover { border-color: var(--accent); }
 
+        .btn-text {
+            color: var(--text2); font-size: 0.9rem;
+            text-decoration: none; transition: color 0.15s;
+        }
+        .btn-text:hover { color: var(--accent2); }
+
         /* Features */
         .features {
             display: grid;
@@ -178,11 +184,16 @@
             <p class="en">An open-source Android app that creates local SOCKS5 and HTTP proxies over an encrypted SSH tunnel.</p>
             <p class="zh">一款开源 Android 应用，通过 SSH 加密隧道在本地创建 SOCKS5 和 HTTP 代理。</p>
             <div class="btn-group">
-                <a href="https://github.com/JoursBleu/red-arrow/releases" class="btn btn-primary">
-                    ⬇ <span class="en">Download APK</span><span class="zh">下载 APK</span>
+                <a href="https://github.com/JoursBleu/red-arrow/releases/download/v0.1.0-beta/red-arrow-v0.1.0-beta.apk" class="btn btn-primary">
+                    ⬇ <span class="en">Download v0.1.0-beta</span><span class="zh">下载 v0.1.0-beta</span>
                 </a>
                 <a href="https://github.com/JoursBleu/red-arrow" class="btn btn-secondary">
                     ☆ <span class="en">GitHub</span><span class="zh">源代码</span>
+                </a>
+            </div>
+            <div class="btn-group" style="margin-top: 8px;">
+                <a href="https://github.com/JoursBleu/red-arrow/releases" class="btn-text">
+                    <span class="en">All Releases →</span><span class="zh">历史版本 →</span>
                 </a>
             </div>
         </section>
