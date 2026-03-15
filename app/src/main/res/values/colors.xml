@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Brand -->
     <color name="red_primary">#D32F2F</color>
     <color name="red_primary_dark">#B71C1C</color>
     <color name="red_accent">#FF5252</color>
+    <color name="white">#FFFFFF</color>
+
+    <!-- Surface (light) -->
+    <color name="surface">#FAFAFA</color>
+    <color name="on_surface">#1C1C1C</color>
+    <color name="surface_variant">#FFFFFF</color>
+    <color name="on_surface_variant">#666666</color>
+    <color name="card_background">#F0F0F0</color>
+
+    <!-- Status -->
     <color name="status_green">#4CAF50</color>
     <color name="status_yellow">#FFC107</color>
     <color name="status_red">#F44336</color>
-    <color name="white">#FFFFFF</color>
-    <color name="background">#FAFAFA</color>
-
-    <!-- Dark theme colors -->
-    <color name="background_dark">#121212</color>
-    <color name="surface_dark">#1E1E1E</color>
-    <color name="card_dark">#2A2A2A</color>
-    <color name="text_primary">#EEEEEE</color>
-    <color name="text_secondary">#AAAAAA</color>
-    <color name="grey_disconnected">#666666</color>
-    <color name="green_connected">#4CAF50</color>
+    <color name="grey_disconnected">#AAAAAA</color>
+    <color name="green_connected">#388E3C</color>
 </resources>

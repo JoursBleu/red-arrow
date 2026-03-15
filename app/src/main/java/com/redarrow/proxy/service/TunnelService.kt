@@ -70,7 +70,7 @@ class TunnelService : Service() {
         if (_state.value.isConnected || _state.value.isConnecting) return
 
         _state.value = TunnelState(status = TunnelState.Status.CONNECTING)
-        startForeground(NOTIFICATION_ID, buildNotification("正在连接..."))
+        startForeground(NOTIFICATION_ID, buildNotification(getString(R.string.notif_connecting)))
         acquireWakeLock()
 
         scope.launch {
@@ -78,9 +78,7 @@ class TunnelService : Service() {
             result.fold(
                 onSuccess = {
                     try {
-                        // 启动 SOCKS5 代理
                         socksServer = Socks5Server(sshManager, config.socksPort).also { it.start() }
-                        // 启动 HTTP 代理
                         httpProxyServer = HttpProxyServer(sshManager, config.httpPort).also { it.start() }
 
                         _state.value = TunnelState(
@@ -90,14 +88,14 @@ class TunnelService : Service() {
                             connectedHost = "${config.host}:${config.port}",
                             connectedAt = System.currentTimeMillis(),
                         )
-                        updateNotification("已连接 ${config.host}")
+                        updateNotification(getString(R.string.notif_connected, config.host))
                         Log.i(TAG, "Tunnel active: SOCKS5=:${config.socksPort} HTTP=:${config.httpPort}")
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to start proxy servers", e)
                         sshManager.disconnect()
                         _state.value = TunnelState(
                             status = TunnelState.Status.ERROR,
-                            errorMessage = "代理服务器启动失败: ${e.message}"
+                            errorMessage = getString(R.string.error_proxy_start_failed, e.message)
                         )
                         releaseWakeLock()
                         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -106,7 +104,7 @@ class TunnelService : Service() {
                 onFailure = { e ->
                     _state.value = TunnelState(
                         status = TunnelState.Status.ERROR,
-                        errorMessage = e.message ?: "连接失败"
+                        errorMessage = e.message ?: getString(R.string.error_connect_failed)
                     )
                     releaseWakeLock()
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -137,10 +135,10 @@ class TunnelService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "SSH 隧道服务",
+            getString(R.string.notif_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "SSH 隧道运行状态"
+            description = getString(R.string.notif_channel_desc)
             setShowBadge(false)
         }
         val nm = getSystemService(NotificationManager::class.java)
@@ -161,11 +159,11 @@ class TunnelService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Red Arrow")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pendingIntent)
-            .addAction(R.drawable.ic_notification, "断开", disconnectIntent)
+            .addAction(R.drawable.ic_notification, getString(R.string.btn_disconnect), disconnectIntent)
             .setOngoing(true)
             .build()
     }
@@ -180,7 +178,7 @@ class TunnelService : Service() {
         wakeLock = pm.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "RedArrow::TunnelWakeLock"
-        ).apply { acquire(24 * 60 * 60 * 1000L) } // 24h max
+        ).apply { acquire(24 * 60 * 60 * 1000L) }
     }
 
     private fun releaseWakeLock() {

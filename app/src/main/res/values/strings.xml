@@ -1,4 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Red Arrow</string>
+
+    <!-- Status -->
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_connected">Connected %s</string>
+    <string name="status_error">Connection Failed</string>
+
+    <!-- SSH Card -->
+    <string name="ssh_server">SSH Server</string>
+    <string name="hint_host">Host</string>
+    <string name="hint_port">Port</string>
+    <string name="hint_username">Username</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_key">Key</string>
+    <string name="hint_password">Password</string>
+    <string name="btn_select_key">Select Key File</string>
+    <string name="key_not_selected">No file selected</string>
+    <string name="hint_key_passphrase">Key Passphrase (optional)</string>
+
+    <!-- Proxy Card -->
+    <string name="proxy_ports">Proxy Ports</string>
+    <string name="hint_socks_port">SOCKS5 Port</string>
+    <string name="hint_http_port">HTTP Port</string>
+
+    <!-- Buttons -->
+    <string name="btn_connect">Connect</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_retry">Retry</string>
+
+    <!-- Log -->
+    <string name="log_title">Log</string>
+    <string name="btn_clear_log">Clear</string>
+
+    <!-- Errors -->
+    <string name="error_incomplete">Please fill in all connection info</string>
+    <string name="error_read_key">Failed to read key file: %s</string>
+
+    <!-- Settings -->
+    <string name="settings">Settings</string>
+    <string name="theme_label">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="language_label">Language</string>
+    <string name="language_system">System</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+
+    <!-- Service -->
+    <string name="notif_channel_name">SSH Tunnel Service</string>
+    <string name="notif_channel_desc">SSH tunnel running status</string>
+    <string name="notif_connecting">Connecting…</string>
+    <string name="notif_connected">Connected %s</string>
+    <string name="error_proxy_start_failed">Proxy server failed: %s</string>
+    <string name="error_connect_failed">Connection failed</string>
 </resources>

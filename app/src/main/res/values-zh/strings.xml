@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Red Arrow</string>
+
+    <!-- Status -->
+    <string name="status_disconnected">未连接</string>
+    <string name="status_connecting">正在连接…</string>
+    <string name="status_connected">已连接 %s</string>
+    <string name="status_error">连接失败</string>
+
+    <!-- SSH Card -->
+    <string name="ssh_server">SSH 服务器</string>
+    <string name="hint_host">主机地址</string>
+    <string name="hint_port">端口</string>
+    <string name="hint_username">用户名</string>
+    <string name="auth_password">密码</string>
+    <string name="auth_key">私钥</string>
+    <string name="hint_password">密码</string>
+    <string name="btn_select_key">选择私钥文件</string>
+    <string name="key_not_selected">未选择文件</string>
+    <string name="hint_key_passphrase">私钥密码（可选）</string>
+
+    <!-- Proxy Card -->
+    <string name="proxy_ports">代理端口</string>
+    <string name="hint_socks_port">SOCKS5 端口</string>
+    <string name="hint_http_port">HTTP 端口</string>
+
+    <!-- Buttons -->
+    <string name="btn_connect">连接</string>
+    <string name="btn_disconnect">断开</string>
+    <string name="btn_cancel">取消</string>
+    <string name="btn_retry">重试</string>
+
+    <!-- Log -->
+    <string name="log_title">日志</string>
+    <string name="btn_clear_log">清除</string>
+
+    <!-- Errors -->
+    <string name="error_incomplete">请填写完整的连接信息</string>
+    <string name="error_read_key">读取私钥文件失败: %s</string>
+
+    <!-- Settings -->
+    <string name="settings">设置</string>
+    <string name="theme_label">主题</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="language_label">语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+
+    <!-- Service -->
+    <string name="notif_channel_name">SSH 隧道服务</string>
+    <string name="notif_channel_desc">SSH 隧道运行状态</string>
+    <string name="notif_connecting">正在连接…</string>
+    <string name="notif_connected">已连接 %s</string>
+    <string name="error_proxy_start_failed">代理服务器启动失败: %s</string>
+    <string name="error_connect_failed">连接失败</string>
+</resources>

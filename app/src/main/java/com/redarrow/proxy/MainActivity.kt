@@ -15,6 +15,8 @@ import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import com.redarrow.proxy.databinding.ActivityMainBinding
 import com.redarrow.proxy.model.ConnectionConfig
@@ -32,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var tunnelService: TunnelService? = null
     private var serviceBound = false
 
-    // 已选择的私钥内容（从文件读取）
     private var selectedKeyContent: String = ""
     private var selectedKeyFileName: String = ""
 
@@ -51,9 +52,8 @@ class MainActivity : AppCompatActivity() {
 
     private val notifPermLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* 不管结果都继续 */ }
+    ) { /* continue regardless */ }
 
-    // 文件选择器回调
     private val keyFileLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -62,6 +62,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Apply saved theme before setContentView
+        applySavedTheme()
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -70,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         setupAuthToggle()
         setupKeyFilePicker()
         setupConnectButton()
+        setupSettings()
     }
 
     override fun onStart() {
@@ -87,6 +92,76 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ==================== Settings ====================
+
+    private fun applySavedTheme() {
+        val prefs = getSharedPreferences("red_arrow_settings", Context.MODE_PRIVATE)
+        when (prefs.getString("theme", "system")) {
+            "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+    }
+
+    private fun setupSettings() {
+        val prefs = getSharedPreferences("red_arrow_settings", Context.MODE_PRIVATE)
+
+        // Toggle settings panel visibility
+        binding.btnSettings.setOnClickListener {
+            val card = binding.cardSettings
+            card.visibility = if (card.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+
+        // --- Theme toggle ---
+        val savedTheme = prefs.getString("theme", "system") ?: "system"
+        when (savedTheme) {
+            "light" -> binding.btnThemeLight.isChecked = true
+            "dark" -> binding.btnThemeDark.isChecked = true
+            else -> binding.btnThemeSystem.isChecked = true
+        }
+
+        binding.toggleTheme.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val mode = when (checkedId) {
+                R.id.btnThemeLight -> "light"
+                R.id.btnThemeDark -> "dark"
+                else -> "system"
+            }
+            prefs.edit().putString("theme", mode).apply()
+            when (mode) {
+                "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+                "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+            }
+        }
+
+        // --- Language toggle ---
+        val savedLang = prefs.getString("language", "system") ?: "system"
+        when (savedLang) {
+            "zh" -> binding.btnLangZh.isChecked = true
+            "en" -> binding.btnLangEn.isChecked = true
+            else -> binding.btnLangSystem.isChecked = true
+        }
+
+        binding.toggleLanguage.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            val lang = when (checkedId) {
+                R.id.btnLangZh -> "zh"
+                R.id.btnLangEn -> "en"
+                else -> "system"
+            }
+            prefs.edit().putString("language", lang).apply()
+            val locales = if (lang == "system") {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(lang)
+            }
+            AppCompatDelegate.setApplicationLocales(locales)
+        }
+    }
+
+    // ==================== Notification ====================
+
     private fun requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -96,6 +171,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    // ==================== Config ====================
 
     private fun loadSavedConfig() {
         val config = viewModel.loadConfig()
@@ -108,13 +185,11 @@ class MainActivity : AppCompatActivity() {
             etSocksPort.setText(config.socksPort.toString())
             etHttpPort.setText(config.httpPort.toString())
         }
-        // 恢复已保存的私钥
         selectedKeyContent = config.privateKey
         selectedKeyFileName = config.privateKeyFileName
         if (selectedKeyFileName.isNotBlank()) {
             binding.tvKeyFileName.text = selectedKeyFileName
         }
-        // 设置认证方式
         when (config.authMethod) {
             ConnectionConfig.AuthMethod.PASSWORD -> binding.btnAuthPassword.isChecked = true
             ConnectionConfig.AuthMethod.PUBLIC_KEY -> binding.btnAuthKey.isChecked = true
@@ -137,48 +212,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupKeyFilePicker() {
         binding.btnSelectKey.setOnClickListener {
-            // 打开文件选择器，支持所有文件类型
             keyFileLauncher.launch(arrayOf("*/*"))
         }
     }
 
-    /**
-     * 读取用户选择的私钥文件
-     */
     private fun readKeyFile(uri: Uri) {
         try {
-            // 读取文件名
             val fileName = getFileName(uri) ?: "unknown_key"
-            // 读取文件内容
             val content = contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader().readText()
-            } ?: throw Exception("无法读取文件")
+            } ?: throw Exception(getString(R.string.error_read_key, "null stream"))
 
             selectedKeyContent = content
             selectedKeyFileName = fileName
             binding.tvKeyFileName.text = fileName
         } catch (e: Exception) {
             binding.tvError.apply {
-                text = "读取私钥文件失败: ${e.message}"
+                text = getString(R.string.error_read_key, e.message)
                 visibility = View.VISIBLE
             }
         }
     }
 
-    /**
-     * 从 URI 获取文件名
-     */
     private fun getFileName(uri: Uri): String? {
-        // 先尝试从 ContentResolver 查询
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (nameIndex >= 0 && cursor.moveToFirst()) {
                 return cursor.getString(nameIndex)
             }
         }
-        // fallback: 从 URI path 提取
         return uri.lastPathSegment?.substringAfterLast('/')
     }
+
+    // ==================== Connect ====================
 
     private fun setupConnectButton() {
         binding.btnConnect.setOnClickListener {
@@ -191,7 +257,7 @@ class MainActivity : AppCompatActivity() {
                 val config = buildConfig()
                 if (!config.isValid()) {
                     binding.tvError.apply {
-                        text = "请填写完整的连接信息"
+                        text = getString(R.string.error_incomplete)
                         visibility = View.VISIBLE
                     }
                     return@setOnClickListener
@@ -220,6 +286,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    // ==================== State ====================
+
     private fun observeState() {
         lifecycleScope.launch {
             tunnelService?.state?.collectLatest { state ->
@@ -232,29 +300,28 @@ class MainActivity : AppCompatActivity() {
         binding.apply {
             when (state.status) {
                 TunnelState.Status.DISCONNECTED -> {
-                    tvStatus.text = "未连接"
+                    tvStatus.text = getString(R.string.status_disconnected)
                     statusDot.setBackgroundResource(R.drawable.status_dot_red)
-                    btnConnect.text = "连接"
+                    btnConnect.text = getString(R.string.btn_connect)
                     btnConnect.isEnabled = true
                     tvProxyInfo.visibility = View.GONE
                     tvUptime.text = ""
                     setFieldsEnabled(true)
                 }
                 TunnelState.Status.CONNECTING -> {
-                    tvStatus.text = "正在连接..."
+                    tvStatus.text = getString(R.string.status_connecting)
                     statusDot.setBackgroundResource(R.drawable.status_dot_yellow)
-                    btnConnect.text = "取消"
+                    btnConnect.text = getString(R.string.btn_cancel)
                     btnConnect.isEnabled = true
                     setFieldsEnabled(false)
                 }
                 TunnelState.Status.CONNECTED -> {
-                    tvStatus.text = "已连接 ${state.connectedHost}"
+                    tvStatus.text = getString(R.string.status_connected, state.connectedHost)
                     statusDot.setBackgroundResource(R.drawable.status_dot_green)
-                    btnConnect.text = "断开"
+                    btnConnect.text = getString(R.string.btn_disconnect)
                     btnConnect.isEnabled = true
                     tvProxyInfo.apply {
-                        text = "SOCKS5  127.0.0.1:${state.socksPort}\n" +
-                               "HTTP      127.0.0.1:${state.httpPort}"
+                        text = "SOCKS5  127.0.0.1:${state.socksPort}\nHTTP      127.0.0.1:${state.httpPort}"
                         visibility = View.VISIBLE
                     }
                     val secs = state.uptimeSeconds
@@ -262,9 +329,9 @@ class MainActivity : AppCompatActivity() {
                     setFieldsEnabled(false)
                 }
                 TunnelState.Status.ERROR -> {
-                    tvStatus.text = "连接失败"
+                    tvStatus.text = getString(R.string.status_error)
                     statusDot.setBackgroundResource(R.drawable.status_dot_red)
-                    btnConnect.text = "重试"
+                    btnConnect.text = getString(R.string.btn_retry)
                     btnConnect.isEnabled = true
                     tvError.apply {
                         text = state.errorMessage
