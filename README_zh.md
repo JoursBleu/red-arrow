@@ -1,5 +1,7 @@
 # Red Arrow
 
+[English](README.md)
+
 Android SSH 隧道 + SOCKS5/HTTP 代理应用。通过 SSH 连接远程服务器，在本地建立加密代理，所有流量经由 SSH 隧道转发。
 
 ## 截图

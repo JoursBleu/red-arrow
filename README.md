@@ -1,5 +1,7 @@
 # Red Arrow
 
+[中文文档](README_zh.md)
+
 An Android app that creates local SOCKS5 and HTTP proxies over an SSH tunnel. All traffic is encrypted and forwarded through a remote SSH server.
 
 ## Screenshots
