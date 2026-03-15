@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity() {
             etKeyPassphrase.setText(config.privateKeyPassphrase)
             etSocksPort.setText(config.socksPort.toString())
             etHttpPort.setText(config.httpPort.toString())
+            etProxyPassword.setText(config.proxyPassword)
         }
         selectedKeyContent = config.privateKey
         selectedKeyFileName = config.privateKeyFileName
@@ -283,6 +284,7 @@ class MainActivity : AppCompatActivity() {
                          else ConnectionConfig.AuthMethod.PASSWORD,
             socksPort = binding.etSocksPort.text.toString().toIntOrNull() ?: 1080,
             httpPort = binding.etHttpPort.text.toString().toIntOrNull() ?: 8080,
+            proxyPassword = binding.etProxyPassword.text.toString(),
         )
     }
 
@@ -321,7 +323,7 @@ class MainActivity : AppCompatActivity() {
                     btnConnect.text = getString(R.string.btn_disconnect)
                     btnConnect.isEnabled = true
                     tvProxyInfo.apply {
-                        text = "SOCKS5  127.0.0.1:${state.socksPort}\nHTTP      127.0.0.1:${state.httpPort}"
+                        text = "SOCKS5  0.0.0.0:${state.socksPort}\nHTTP      0.0.0.0:${state.httpPort}"
                         visibility = View.VISIBLE
                     }
                     val secs = state.uptimeSeconds
@@ -354,6 +356,7 @@ class MainActivity : AppCompatActivity() {
             btnSelectKey.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
+            etProxyPassword.isEnabled = enabled
             btnAuthPassword.isEnabled = enabled
             btnAuthKey.isEnabled = enabled
         }

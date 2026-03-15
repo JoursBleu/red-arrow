@@ -1,5 +1,6 @@
 package com.redarrow.proxy.proxy
 
+import android.util.Base64
 import android.util.Log
 import com.redarrow.proxy.ssh.SshManager
 import java.io.BufferedReader
@@ -15,21 +16,21 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 本地 HTTP 代理服务器
- * 接收 HTTP/HTTPS 请求，通过 SSH direct-tcpip 通道转发
- *
- * 支持:
- * - HTTP CONNECT (HTTPS 隧道)
- * - HTTP 普通请求转发 (GET/POST 等)
+ * HTTP 代理服务器
+ * 监听 0.0.0.0，支持 CONNECT (HTTPS) 和普通 HTTP 转发
+ * 可选 Proxy-Authorization Basic 认证
  */
 class HttpProxyServer(
     private val sshManager: SshManager,
     private val port: Int,
+    private val proxyPassword: String = "",
 ) {
     companion object {
         private const val TAG = "HttpProxy"
         private const val BUFFER_SIZE = 32768
     }
+
+    private val requireAuth get() = proxyPassword.isNotBlank()
 
     private var serverSocket: ServerSocket? = null
     private var executor: ExecutorService? = null
@@ -40,8 +41,8 @@ class HttpProxyServer(
         running.set(true)
 
         executor = Executors.newCachedThreadPool()
-        serverSocket = ServerSocket(port, 50, java.net.InetAddress.getByName("127.0.0.1"))
-        Log.i(TAG, "HTTP proxy started on 127.0.0.1:$port")
+        serverSocket = ServerSocket(port, 50, java.net.InetAddress.getByName("0.0.0.0"))
+        Log.i(TAG, "HTTP proxy started on 0.0.0.0:$port (auth=${requireAuth})")
 
         Thread({
             while (running.get()) {
@@ -72,7 +73,6 @@ class HttpProxyServer(
             val input = client.getInputStream()
             val reader = BufferedReader(InputStreamReader(input))
 
-            // 读取请求行
             val requestLine = reader.readLine() ?: run {
                 client.close()
                 return
@@ -95,6 +95,12 @@ class HttpProxyServer(
                 headers.add(line)
             }
 
+            // 鉴权检查
+            if (requireAuth && !checkAuth(headers)) {
+                send407(client)
+                return
+            }
+
             if (method == "CONNECT") {
                 handleConnect(client, uri, headers)
             } else {
@@ -108,9 +114,46 @@ class HttpProxyServer(
     }
 
     /**
-     * 处理 CONNECT 方法 (HTTPS 隧道)
-     * 客户端发送: CONNECT host:port HTTP/1.1
+     * 检查 Proxy-Authorization: Basic base64(user:password)
+     * 用户名任意，只检查密码部分
      */
+    private fun checkAuth(headers: List<String>): Boolean {
+        val authHeader = headers.find {
+            it.startsWith("Proxy-Authorization:", ignoreCase = true)
+        } ?: return false
+
+        val value = authHeader.substringAfter(":").trim()
+        if (!value.startsWith("Basic ", ignoreCase = true)) return false
+
+        return try {
+            val decoded = String(Base64.decode(value.substring(6), Base64.NO_WRAP))
+            // format: username:password
+            val colonIdx = decoded.indexOf(':')
+            if (colonIdx < 0) return false
+            val clientPassword = decoded.substring(colonIdx + 1)
+            clientPassword == proxyPassword
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 发送 407 Proxy Authentication Required
+     */
+    private fun send407(client: Socket) {
+        try {
+            val body = "<html><body><h1>407 Proxy Authentication Required</h1></body></html>"
+            val response = "HTTP/1.1 407 Proxy Authentication Required\r\n" +
+                    "Proxy-Authenticate: Basic realm=\"Red Arrow Proxy\"\r\n" +
+                    "Content-Type: text/html\r\n" +
+                    "Content-Length: ${body.length}\r\n" +
+                    "Connection: close\r\n\r\n" +
+                    body
+            client.getOutputStream().write(response.toByteArray())
+            client.getOutputStream().flush()
+        } catch (_: Exception) {}
+    }
+
     private fun handleConnect(client: Socket, hostPort: String, headers: List<String>) {
         val (host, port) = parseHostPort(hostPort, 443)
         Log.d(TAG, "CONNECT $host:$port")
@@ -129,12 +172,10 @@ class HttpProxyServer(
             return
         }
 
-        // 告诉客户端隧道已建立
         val output = client.getOutputStream()
         output.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
         output.flush()
 
-        // 双向转发
         val remoteIn = channel.inputStream
         val remoteOut = channel.outputStream
 
@@ -147,10 +188,6 @@ class HttpProxyServer(
         channel.disconnect()
     }
 
-    /**
-     * 处理普通 HTTP 请求 (GET/POST 等)
-     * 转发整个 HTTP 请求到目标服务器
-     */
     private fun handleHttp(
         client: Socket,
         method: String,
@@ -159,7 +196,6 @@ class HttpProxyServer(
         headers: List<String>,
         reader: BufferedReader
     ) {
-        // 解析 URI: http://host:port/path
         val url = if (uri.startsWith("http://")) uri else "http://$uri"
         val hostPortPath = url.removePrefix("http://")
         val slashIndex = hostPortPath.indexOf('/')
@@ -185,10 +221,8 @@ class HttpProxyServer(
         val remoteOut = channel.outputStream
         val remoteIn = channel.inputStream
 
-        // 重写请求行，使用相对路径
         remoteOut.write("$method $path $httpVersion\r\n".toByteArray())
 
-        // 转发 headers (过滤 Proxy- 头)
         for (header in headers) {
             if (!header.startsWith("Proxy-", ignoreCase = true)) {
                 remoteOut.write("$header\r\n".toByteArray())
@@ -197,7 +231,6 @@ class HttpProxyServer(
         remoteOut.write("\r\n".toByteArray())
         remoteOut.flush()
 
-        // 如果有 body (Content-Length)，转发
         val contentLength = headers.find {
             it.startsWith("Content-Length:", ignoreCase = true)
         }?.substringAfter(":")?.trim()?.toLongOrNull()
@@ -215,7 +248,6 @@ class HttpProxyServer(
             remoteOut.flush()
         }
 
-        // 转发响应回客户端
         val clientOut = client.getOutputStream()
         val buf = ByteArray(BUFFER_SIZE)
         try {

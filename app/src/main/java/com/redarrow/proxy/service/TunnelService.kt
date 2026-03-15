@@ -78,8 +78,8 @@ class TunnelService : Service() {
             result.fold(
                 onSuccess = {
                     try {
-                        socksServer = Socks5Server(sshManager, config.socksPort).also { it.start() }
-                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort).also { it.start() }
+                        socksServer = Socks5Server(sshManager, config.socksPort, config.proxyPassword).also { it.start() }
+                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort, config.proxyPassword).also { it.start() }
 
                         _state.value = TunnelState(
                             status = TunnelState.Status.CONNECTED,
