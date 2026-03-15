@@ -1,82 +1,85 @@
 # Red Arrow
 
-Android SSH 反向隧道应用 — 通过手机 SSH 连接到公网服务器，建立反向端口转发，将内网服务（如本地 LLM Serving）暴露给外部访问。
-
-## 场景
-
-在本地 GPU 机器上部署了 vLLM / Ollama / llama.cpp 等 LLM 推理服务，但机器在 NAT 内网中没有公网 IP。通过 Red Arrow：
-
-1. 手机连接公网 SSH 服务器，建立 SSH 隧道
-2. 内网 LLM 服务端口通过隧道映射到公网服务器
-3. 外部用户通过公网服务器地址即可调用 LLM API
-
-```
-                        ┌───────────────────┐
-                        │   公网 SSH 服务器   │
-                        │  (有公网 IP)        │
-                        │                   │
-                        │  :8000 ← 隧道映射  │
-                        └────────┬──────────┘
-                                 │ SSH 隧道
-                                 │
-┌──────────────┐      ┌──────────┴──────────┐
-│ 内网 GPU 机器 │      │   Android 手机       │
-│              │      │   Red Arrow App     │
-│ vLLM :8000   │←LAN→│                     │
-│ Ollama :11434│      │  SSH + 端口转发      │
-└──────────────┘      └─────────────────────┘
-                                 ↕
-                        外部用户通过公网 IP
-                        访问 LLM API
-```
+Android SSH 隧道 + SOCKS5/HTTP 代理应用。通过 SSH 连接到远程服务器，在本地创建加密代理，所有流量经由 SSH 隧道转发。
 
 ## 功能
 
 - **SSH 隧道**: 连接远程 SSH 服务器，建立加密隧道穿透 NAT
-- **反向端口转发**: 将内网服务端口映射到公网（类似 `ssh -R`）
-- **SOCKS5 代理**: 本地 SOCKS5 代理 (默认 :1080)
-- **HTTP/HTTPS 代理**: 自动将流量通过 SSH 隧道转发 (默认 :8080)
+- **SOCKS5 代理**: 本地 SOCKS5 代理 (默认 :1080)，监听 0.0.0.0
+- **HTTP 代理**: 本地 HTTP 代理 (默认 :8080)，监听 0.0.0.0
+- **代理鉴权**: 可选的代理用户名 + 密码认证 (SOCKS5 RFC 1929 / HTTP Basic)
 - **密码 / 密钥认证**: 支持两种 SSH 认证方式
+- **密钥管理**: 生成 Ed25519/RSA 密钥对，导入私钥，发送公钥到服务器 (ssh-copy-id)
 - **前台服务**: WakeLock 保活，隧道长时间稳定运行
+- **实时日志**: 连接/代理/错误日志实时显示
+- **活跃连接**: 按 IP 分组显示当前代理连接数
+- **日夜主题**: Material Design 3，支持浅色/深色/跟随系统
+- **中英双语**: 支持中文和英文界面
+- **底部导航**: 首页 / 密钥 / 设置 三页切换
 - **自动保存配置**: 重启 App 无需重新填写
+- **卸载清理**: 密钥和配置存储在应用内部目录，卸载时自动删除
 
-## 典型用法：暴露本地 LLM 服务
-
-### 1. 本地启动 LLM 服务
-
-```bash
-# vLLM
-vllm serve Qwen/Qwen2-7B --host 0.0.0.0 --port 8000
-
-# 或 Ollama
-ollama serve  # 默认 :11434
-```
-
-### 2. 手机端配置 Red Arrow
-
-| 字段 | 值 |
-|------|-----|
-| SSH 主机 | 你的公网服务器 IP |
-| SSH 端口 | 22 |
-| 用户名 | your_user |
-| 认证方式 | 密码 或 密钥 |
-| SOCKS5 端口 | 1080 |
-| HTTP 端口 | 8080 |
-
-点击「连接」建立隧道。
-
-### 3. 在公网服务器上设置端口转发
-
-在公网服务器的 `sshd_config` 中启用：
+## 截图
 
 ```
-GatewayPorts yes
+┌─────────────────────────┐
+│  Red Arrow               │
+│  ● 已连接 192.168.1.1    │
+│                          │
+│  ┌─ SSH 服务器 ─────────┐│
+│  │ 主机: xxx  端口: 22   ││
+│  │ 用户名: root          ││
+│  │ [密码] [密钥]         ││
+│  │ [选择密钥] my_key     ││
+│  │ [发送公钥到服务器]    ││
+│  └───────────────────────┘│
+│  ┌─ 代理端口 ───────────┐│
+│  │ SOCKS5: 1080          ││
+│  │ HTTP:   8080          ││
+│  └───────────────────────┘│
+│  [========= 断开 =========]│
+│                          │
+│  ┌─ 活跃连接 ───────────┐│
+│  │ 192.168.1.5 — 3 conn  ││
+│  │ 10.0.0.1 — 1 conn     ││
+│  └───────────────────────┘│
+│                          │
+│  [首页]  [密钥]  [设置]   │
+└──────────────────────────┘
 ```
 
-这样外部用户就可以通过 `http://公网IP:8000/v1/chat/completions` 调用你的 LLM API。
+## 使用
 
+### 1. 下载安装
 
-### 4. 开启后台运行权限
+从 Release 下载 APK 或自行构建。
+
+### 2. 配置 SSH 服务器
+
+填写主机地址、端口、用户名，选择密码或密钥认证。
+
+密钥认证流程：
+1. 进入「密钥」页面，生成 Ed25519/RSA 密钥对（或导入已有私钥）
+2. 回到首页，选择已存储的密钥
+3. 点击「发送公钥到服务器」将公钥追加到远程 `~/.ssh/authorized_keys`
+4. 之后即可使用密钥认证连接
+
+### 3. 连接
+
+点击「连接」，代理信息会显示在界面上：
+
+```
+SOCKS5  0.0.0.0:1080
+HTTP    0.0.0.0:8080
+```
+
+局域网内其他设备可直接使用手机 IP 作为代理地址。
+
+### 4. 代理鉴权（可选）
+
+在代理端口区域填写用户名和密码，即可为 SOCKS5/HTTP 代理启用认证。留空则不鉴权。
+
+### 5. 后台运行
 
 > **重要**：为确保隧道长时间稳定运行，需要手动设置允许 App 后台活动：
 >
@@ -86,50 +89,50 @@ GatewayPorts yes
 > - **vivo**: 设置 → 电池 → 后台高耗电 → 允许 Red Arrow
 > - **三星**: 设置 → 电池 → 后台使用限制 → 将 Red Arrow 从限制列表移除
 > - **原生 Android**: 设置 → 应用 → Red Arrow → 电池 → 不受限制
->
-> 否则系统可能在锁屏后杀死 App，导致隧道断开。
 
 ## 构建
 
 ```bash
-# 需要 Android SDK
 export ANDROID_HOME=/path/to/android-sdk
 ./gradlew assembleDebug
-
-# APK 输出路径
-# app/build/outputs/apk/debug/app-debug.apk
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 技术架构
+## 技术栈
+
+- **语言**: Kotlin
+- **UI**: Material Design 3 + ViewBinding
+- **SSH**: [mwiede/jsch](https://github.com/mwiede/jsch) 0.2.18
+- **异步**: Kotlin Coroutines + StateFlow
+- **构建**: Gradle 8.7, AGP 8.5.2, compileSdk 35, minSdk 26
+
+## 架构
 
 ```
-┌─────────────────────────────────────────┐
-│              Red Arrow App              │
-│                                         │
-│  ┌───────────┐                          │
-│  │ MainActivity │  ← Material Design 3  │
-│  └──────┬────┘                          │
-│         │                               │
-│  ┌──────┴──────┐                        │
-│  │ TunnelService│  ← 前台 Service       │
-│  └──────┬──────┘                        │
-│         │                               │
-│  ┌──────┴──────┐                        │
-│  │  SshManager  │  ← JSch SSH 连接      │
-│  └──┬───────┬──┘                        │
-│     │       │                           │
-│  ┌──┴───┐ ┌─┴──────────┐               │
-│  │SOCKS5│ │ HTTP Proxy  │               │
-│  │:1080 │ │ :8080       │               │
-│  └──────┘ └─────────────┘               │
-└─────────────────────────────────────────┘
+MainActivity (首页)
+├── SSH 配置 + 代理配置
+├── 连接/断开控制
+├── 实时日志 (AppLog → StateFlow)
+└── 活跃连接 (ConnectionTracker → StateFlow)
+
+KeysActivity (密钥)
+├── 生成 Ed25519 / RSA 密钥对
+├── 导入私钥文件 (自动提取公钥)
+└── 复制/分享公钥, 删除密钥
+
+SettingsActivity (设置)
+├── 主题切换 (浅色/深色/系统)
+└── 语言切换 (中文/English/系统)
+
+TunnelService (前台服务)
+├── SSH 连接 (JSch)
+├── SOCKS5Server (支持用户名密码鉴权)
+├── HttpProxyServer (支持 Basic 鉴权)
+└── ConnectionTracker (活跃连接追踪)
+
+KeyStoreManager
+└── SharedPreferences + JSON (私钥/公钥/密码 持久化)
 ```
-
-## 依赖
-
-- [mwiede/jsch](https://github.com/mwiede/jsch) - SSH 连接库 (JSch 活跃维护分支)
-- AndroidX / Material Design 3
-- Kotlin Coroutines
 
 ## License
 
