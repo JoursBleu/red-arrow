@@ -67,11 +67,8 @@ class KeyStoreManager(context: Context) {
     }
 
     fun importAndSave(name: String, privateKeyContent: String, passphrase: String = ""): StoredKey {
-        val pub = try {
-            KeyManager.extractPublicKey(privateKeyContent, passphrase)
-        } catch (_: Exception) {
-            ""
-        }
+        val pub = KeyManager.extractPublicKey(privateKeyContent, passphrase)
+        require(pub.isNotBlank()) { "Failed to extract public key" }
         val key = StoredKey(
             id = UUID.randomUUID().toString(),
             name = name,
