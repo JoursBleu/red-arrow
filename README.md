@@ -2,6 +2,12 @@
 
 An Android app that creates local SOCKS5 and HTTP proxies over an SSH tunnel. All traffic is encrypted and forwarded through a remote SSH server.
 
+## Screenshots
+
+| Home | Keys | Settings |
+|:---:|:---:|:---:|
+| ![Home](docs/home_en.jpg) | ![Keys](docs/keys_en.jpg) | ![Settings](docs/settings_en.jpg) |
+
 ## Features
 
 - **SSH Tunnel** — Connect to a remote SSH server, encrypted tunnel through NAT

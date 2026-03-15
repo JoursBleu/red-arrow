@@ -2,6 +2,12 @@
 
 Android SSH 隧道 + SOCKS5/HTTP 代理应用。通过 SSH 连接远程服务器，在本地建立加密代理，所有流量经由 SSH 隧道转发。
 
+## 截图
+
+| 首页 | 密钥 | 设置 |
+|:---:|:---:|:---:|
+| ![首页](docs/home_cn.jpg) | ![密钥](docs/keys_cn.jpg) | ![设置](docs/settings_cn.jpg) |
+
 ## 功能
 
 - **SSH 隧道** — 连接远程 SSH 服务器，加密隧道穿透 NAT
