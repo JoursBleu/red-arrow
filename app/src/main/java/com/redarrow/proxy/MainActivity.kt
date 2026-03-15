@@ -6,11 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.provider.OpenableColumns
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +22,7 @@ import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
+import com.redarrow.proxy.ssh.KeyManager
 import com.redarrow.proxy.ssh.KeyStoreManager
 import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.ui.MainViewModel
@@ -40,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private var selectedKeyContent: String = ""
     private var selectedKeyFileName: String = ""
+    private var selectedKeyPublicKey: String = ""
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -58,12 +58,6 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* continue regardless */ }
 
-    private val keyFileLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri?.let { readKeyFile(it) }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -76,7 +70,8 @@ class MainActivity : AppCompatActivity() {
         requestNotificationPermission()
         loadSavedConfig()
         setupAuthToggle()
-        setupKeyFilePicker()
+        setupKeyPicker()
+        setupSendPubkey()
         setupConnectButton()
         setupBottomNav()
         setupLogCard()
@@ -111,10 +106,10 @@ class MainActivity : AppCompatActivity() {
     private fun setupBottomNav() {
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_home -> true // already on home
+                R.id.nav_home -> true
                 R.id.nav_keys -> {
                     startActivity(Intent(this, KeysActivity::class.java))
-                    false // don't select, stay on home
+                    false
                 }
                 R.id.nav_settings -> {
                     startActivity(Intent(this, SettingsActivity::class.java))
@@ -127,7 +122,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Always reset bottom nav to home when returning
         binding.bottomNav.selectedItemId = R.id.nav_home
     }
 
@@ -162,6 +156,10 @@ class MainActivity : AppCompatActivity() {
         selectedKeyFileName = config.privateKeyFileName
         if (selectedKeyFileName.isNotBlank()) {
             binding.tvKeyFileName.text = selectedKeyFileName
+            // Try to find public key from stored keys
+            val keyStore = KeyStoreManager(this)
+            val stored = keyStore.getAll().find { it.name == selectedKeyFileName }
+            selectedKeyPublicKey = stored?.publicKey ?: ""
         }
         when (config.authMethod) {
             ConnectionConfig.AuthMethod.PASSWORD -> binding.btnAuthPassword.isChecked = true
@@ -183,26 +181,10 @@ class MainActivity : AppCompatActivity() {
         binding.layoutKeyFile.visibility = if (isKey) View.VISIBLE else View.GONE
     }
 
-    private fun setupKeyFilePicker() {
+    private fun setupKeyPicker() {
         binding.btnSelectKey.setOnClickListener {
-            showKeySourceDialog()
+            showStoredKeyPicker()
         }
-    }
-
-    private fun showKeySourceDialog() {
-        val options = arrayOf(
-            getString(R.string.select_stored_key),
-            getString(R.string.import_from_file)
-        )
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.btn_select_key))
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showStoredKeyPicker()
-                    1 -> keyFileLauncher.launch(arrayOf("*/*"))
-                }
-            }
-            .show()
     }
 
     private fun showStoredKeyPicker() {
@@ -220,38 +202,63 @@ class MainActivity : AppCompatActivity() {
                 val key = keys[which]
                 selectedKeyContent = key.privateKey
                 selectedKeyFileName = key.name
+                selectedKeyPublicKey = key.publicKey
                 binding.tvKeyFileName.text = key.name
                 Toast.makeText(this, key.name, Toast.LENGTH_SHORT).show()
             }
             .show()
     }
 
-    private fun readKeyFile(uri: Uri) {
-        try {
-            val fileName = getFileName(uri) ?: "unknown_key"
-            val content = contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().readText()
-            } ?: throw Exception(getString(R.string.error_read_key, "null stream"))
+    // ==================== Send Public Key ====================
 
-            selectedKeyContent = content
-            selectedKeyFileName = fileName
-            binding.tvKeyFileName.text = fileName
-        } catch (e: Exception) {
-            binding.tvError.apply {
-                text = getString(R.string.error_read_key, e.message)
-                visibility = View.VISIBLE
+    private fun setupSendPubkey() {
+        binding.btnSendPubkey.setOnClickListener {
+            val host = binding.etHost.text.toString().trim()
+            val username = binding.etUsername.text.toString().trim()
+            if (host.isBlank() || username.isBlank()) {
+                Toast.makeText(this, getString(R.string.error_fill_server), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (selectedKeyContent.isBlank()) {
+                Toast.makeText(this, getString(R.string.error_no_key), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Get public key: use stored one, or extract from private key
+            var pubKey = selectedKeyPublicKey
+            if (pubKey.isBlank()) {
+                try {
+                    pubKey = KeyManager.extractPublicKey(
+                        selectedKeyContent,
+                        binding.etKeyPassphrase.text.toString()
+                    )
+                } catch (e: Exception) {
+                    Toast.makeText(this, getString(R.string.pubkey_send_failed, e.message), Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+
+            // Need password to authenticate for sending
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.btn_send_pubkey))
+                .setMessage(getString(R.string.sending_pubkey))
+                .show()
+
+            val config = buildConfig().copy(
+                authMethod = ConnectionConfig.AuthMethod.PASSWORD,
+                password = binding.etPassword.text.toString()
+            )
+
+            val finalPubKey = pubKey
+            lifecycleScope.launch {
+                val result = KeyManager.sendPublicKey(config, finalPubKey)
+                result.onSuccess {
+                    Toast.makeText(this@MainActivity, getString(R.string.pubkey_sent), Toast.LENGTH_SHORT).show()
+                }.onFailure { e ->
+                    Toast.makeText(this@MainActivity, getString(R.string.pubkey_send_failed, e.message), Toast.LENGTH_LONG).show()
+                }
             }
         }
-    }
-
-    private fun getFileName(uri: Uri): String? {
-        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (nameIndex >= 0 && cursor.moveToFirst()) {
-                return cursor.getString(nameIndex)
-            }
-        }
-        return uri.lastPathSegment?.substringAfterLast('/')
     }
 
     // ==================== Connect ====================
@@ -404,6 +411,7 @@ class MainActivity : AppCompatActivity() {
             etPassword.isEnabled = enabled
             etKeyPassphrase.isEnabled = enabled
             btnSelectKey.isEnabled = enabled
+            btnSendPubkey.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
             etProxyUsername.isEnabled = enabled

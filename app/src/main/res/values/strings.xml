@@ -16,7 +16,7 @@
     <string name="auth_password">Password</string>
     <string name="auth_key">Key</string>
     <string name="hint_password">Password</string>
-    <string name="btn_select_key">Select Key File</string>
+    <string name="btn_select_key">Select Key</string>
     <string name="key_not_selected">No file selected</string>
     <string name="hint_key_passphrase">Key Passphrase (optional)</string>
 

@@ -16,7 +16,7 @@
     <string name="auth_password">密码</string>
     <string name="auth_key">私钥</string>
     <string name="hint_password">密码</string>
-    <string name="btn_select_key">选择私钥文件</string>
+    <string name="btn_select_key">选择密钥</string>
     <string name="key_not_selected">未选择文件</string>
     <string name="hint_key_passphrase">私钥密码（可选）</string>
 
