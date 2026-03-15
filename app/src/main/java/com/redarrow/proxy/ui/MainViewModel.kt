@@ -44,7 +44,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } catch (_: Exception) { ConnectionConfig.AuthMethod.PASSWORD },
             socksPort = prefs.getInt("socksPort", 1080),
             httpPort = prefs.getInt("httpPort", 8080),
-            proxyUsername = prefs.getString("proxyUsername", "user") ?: "user",
+            proxyUsername = prefs.getString("proxyUsername", "") ?: "",
             proxyPassword = prefs.getString("proxyPassword", "") ?: "",
             keepAliveInterval = prefs.getInt("keepAliveInterval", 30),
         )

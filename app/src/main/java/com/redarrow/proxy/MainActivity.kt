@@ -236,7 +236,7 @@ class MainActivity : AppCompatActivity() {
                          else ConnectionConfig.AuthMethod.PASSWORD,
             socksPort = binding.etSocksPort.text.toString().toIntOrNull() ?: 1080,
             httpPort = binding.etHttpPort.text.toString().toIntOrNull() ?: 8080,
-            proxyUsername = binding.etProxyUsername.text.toString().ifBlank { "user" },
+            proxyUsername = binding.etProxyUsername.text.toString(),
             proxyPassword = binding.etProxyPassword.text.toString(),
         )
     }

@@ -33,7 +33,7 @@ class HttpProxyServer(
         private const val BUFFER_SIZE = 32768
     }
 
-    private val requireAuth get() = proxyPassword.isNotBlank()
+    private val requireAuth get() = proxyUsername.isNotBlank() || proxyPassword.isNotBlank()
 
     private var serverSocket: ServerSocket? = null
     private var executor: ExecutorService? = null

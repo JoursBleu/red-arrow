@@ -350,7 +350,6 @@
                         android:layout_height="wrap_content"
                         android:textColor="?attr/colorOnSurface"
                         android:inputType="text"
-                        android:text="user"
                         android:textSize="14sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
