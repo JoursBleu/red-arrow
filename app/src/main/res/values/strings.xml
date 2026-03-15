@@ -92,4 +92,9 @@
     <string name="key_name_title">Name this key</string>
     <string name="key_imported">Key imported</string>
     <string name="select_stored_key">Select stored key</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_keys">Keys</string>
+    <string name="nav_settings">Settings</string>
 </resources>

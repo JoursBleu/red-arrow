@@ -92,4 +92,9 @@
     <string name="key_name_title">为密钥命名</string>
     <string name="key_imported">密钥已导入</string>
     <string name="select_stored_key">选择已存储的密钥</string>
+
+    <!-- Bottom Navigation -->
+    <string name="nav_home">首页</string>
+    <string name="nav_keys">密钥</string>
+    <string name="nav_settings">设置</string>
 </resources>

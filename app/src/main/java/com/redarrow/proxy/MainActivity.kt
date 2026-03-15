@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
         setupAuthToggle()
         setupKeyFilePicker()
         setupConnectButton()
-        setupSettings()
+        setupBottomNav()
         setupLogCard()
     }
 
@@ -108,10 +108,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupSettings() {
-        binding.btnSettings.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+    private fun setupBottomNav() {
+        binding.bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_home -> true // already on home
+                R.id.nav_keys -> {
+                    startActivity(Intent(this, KeysActivity::class.java))
+                    false // don't select, stay on home
+                }
+                R.id.nav_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    false
+                }
+                else -> false
+            }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Always reset bottom nav to home when returning
+        binding.bottomNav.selectedItemId = R.id.nav_home
     }
 
     // ==================== Notification ====================
@@ -168,16 +185,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupKeyFilePicker() {
         binding.btnSelectKey.setOnClickListener {
-            keyFileLauncher.launch(arrayOf("*/*"))
+            showKeySourceDialog()
         }
+    }
 
-        binding.btnPickStoredKey.setOnClickListener {
-            showStoredKeyPicker()
-        }
-
-        binding.btnManageKeys.setOnClickListener {
-            startActivity(Intent(this, KeysActivity::class.java))
-        }
+    private fun showKeySourceDialog() {
+        val options = arrayOf(
+            getString(R.string.select_stored_key),
+            getString(R.string.import_from_file)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.btn_select_key))
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showStoredKeyPicker()
+                    1 -> keyFileLauncher.launch(arrayOf("*/*"))
+                }
+            }
+            .show()
     }
 
     private fun showStoredKeyPicker() {
@@ -361,7 +386,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 cardConnections.visibility = View.VISIBLE
                 tvConnectionCount.text = getString(R.string.connection_count, connections.size)
-                // 按 IP 分组统计连接数
                 val grouped = connections.groupBy { it.clientIp }
                 tvConnections.text = grouped.entries
                     .sortedByDescending { it.value.size }
@@ -380,8 +404,6 @@ class MainActivity : AppCompatActivity() {
             etPassword.isEnabled = enabled
             etKeyPassphrase.isEnabled = enabled
             btnSelectKey.isEnabled = enabled
-            btnPickStoredKey.isEnabled = enabled
-            btnManageKeys.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
             etProxyUsername.isEnabled = enabled
