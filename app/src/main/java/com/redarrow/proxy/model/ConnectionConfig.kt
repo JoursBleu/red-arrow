@@ -14,6 +14,7 @@ data class ConnectionConfig(
     val authMethod: AuthMethod = AuthMethod.PASSWORD,
     val socksPort: Int = 1080,         // 本地 SOCKS5 代理端口
     val httpPort: Int = 8080,          // 本地 HTTP 代理端口
+    val proxyUsername: String = "user", // 代理用户名（默认 user）
     val proxyPassword: String = "",    // 代理访问密码（空则不鉴权）
     val keepAliveInterval: Int = 30,   // 心跳间隔(秒)
 ) {

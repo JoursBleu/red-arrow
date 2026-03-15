@@ -60,5 +60,10 @@
     <string name="notif_connected">Connected %s</string>
     <string name="error_proxy_start_failed">Proxy server failed: %s</string>
     <string name="error_connect_failed">Connection failed</string>
+    <string name="hint_proxy_username">Proxy Username</string>
     <string name="hint_proxy_password">Proxy Password (optional, blank = no auth)</string>
+    <string name="about">About</string>
+    <string name="version_label">Version</string>
+    <string name="author_label">Author</string>
+    <string name="license_label">License</string>
 </resources>

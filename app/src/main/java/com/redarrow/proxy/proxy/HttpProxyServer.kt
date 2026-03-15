@@ -1,7 +1,7 @@
 package com.redarrow.proxy.proxy
 
 import android.util.Base64
-import android.util.Log
+import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.ssh.SshManager
 import java.io.BufferedReader
@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class HttpProxyServer(
     private val sshManager: SshManager,
     private val port: Int,
+    private val proxyUsername: String = "user",
     private val proxyPassword: String = "",
     private val tracker: ConnectionTracker? = null,
 ) {
@@ -44,7 +45,7 @@ class HttpProxyServer(
 
         executor = Executors.newCachedThreadPool()
         serverSocket = ServerSocket(port, 50, java.net.InetAddress.getByName("0.0.0.0"))
-        Log.i(TAG, "HTTP proxy started on 0.0.0.0:$port (auth=${requireAuth})")
+        AppLog.i(TAG, "HTTP proxy started on 0.0.0.0:$port (auth=${requireAuth})")
 
         Thread({
             while (running.get()) {
@@ -52,9 +53,9 @@ class HttpProxyServer(
                     val client = serverSocket?.accept() ?: break
                     executor?.submit { handleClient(client) }
                 } catch (e: SocketException) {
-                    if (running.get()) Log.e(TAG, "Accept error", e)
+                    if (running.get()) AppLog.e(TAG, "Accept error", e)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Accept error", e)
+                    AppLog.e(TAG, "Accept error", e)
                 }
             }
         }, "http-proxy-accept").start()
@@ -66,7 +67,7 @@ class HttpProxyServer(
         executor?.shutdownNow()
         serverSocket = null
         executor = null
-        Log.i(TAG, "HTTP proxy stopped")
+        AppLog.i(TAG, "HTTP proxy stopped")
     }
 
     private fun handleClient(client: Socket) {
@@ -108,7 +109,7 @@ class HttpProxyServer(
                 connId = handleHttp(client, method, uri, parts[2], headers, reader)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Client handler error", e)
+            AppLog.e(TAG, "Client handler error", e)
         } finally {
             connId?.let { tracker?.remove(it) }
             try { client.close() } catch (_: Exception) {}
@@ -127,8 +128,9 @@ class HttpProxyServer(
             val decoded = String(Base64.decode(value.substring(6), Base64.NO_WRAP))
             val colonIdx = decoded.indexOf(':')
             if (colonIdx < 0) return false
+            val clientUsername = decoded.substring(0, colonIdx)
             val clientPassword = decoded.substring(colonIdx + 1)
-            clientPassword == proxyPassword
+            clientUsername == proxyUsername && clientPassword == proxyPassword
         } catch (e: Exception) {
             false
         }
@@ -153,7 +155,7 @@ class HttpProxyServer(
      */
     private fun handleConnect(client: Socket, hostPort: String, headers: List<String>): String? {
         val (host, port) = parseHostPort(hostPort, 443)
-        Log.d(TAG, "CONNECT $host:$port")
+        AppLog.d(TAG, "CONNECT $host:$port")
 
         val clientIp = client.inetAddress.hostAddress ?: "unknown"
         val connId = tracker?.add(ProxyConnection(
@@ -173,7 +175,7 @@ class HttpProxyServer(
         try {
             channel.connect(10000)
         } catch (e: Exception) {
-            Log.e(TAG, "Channel connect failed: $host:$port", e)
+            AppLog.e(TAG, "Channel connect failed: $host:$port", e)
             sendError(client, 502, "Bad Gateway - Connection failed")
             return connId
         }
@@ -210,7 +212,7 @@ class HttpProxyServer(
         val path = if (slashIndex >= 0) hostPortPath.substring(slashIndex) else "/"
 
         val (host, port) = parseHostPort(hostPort, 80)
-        Log.d(TAG, "$method $host:$port$path")
+        AppLog.d(TAG, "$method $host:$port$path")
 
         val clientIp = client.inetAddress.hostAddress ?: "unknown"
         val connId = tracker?.add(ProxyConnection(

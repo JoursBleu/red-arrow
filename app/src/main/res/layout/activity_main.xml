@@ -90,125 +90,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- Settings panel (hidden by default) -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardSettings"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:visibility="gone"
-            app:cardBackgroundColor="?attr/colorSurfaceVariant"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="2dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings"
-                    android:textColor="@color/red_accent"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
-
-                <!-- Theme -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/theme_label"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp"
-                    android:layout_marginBottom="4dp" />
-
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/toggleTheme"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:singleSelection="true"
-                    app:selectionRequired="true"
-                    app:checkedButton="@id/btnThemeSystem">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeSystem"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/theme_system"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeLight"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/theme_light"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnThemeDark"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/theme_dark"
-                        android:textSize="11sp" />
-                </com.google.android.material.button.MaterialButtonToggleGroup>
-
-                <!-- Language -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/language_label"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textSize="13sp"
-                    android:layout_marginBottom="4dp" />
-
-                <com.google.android.material.button.MaterialButtonToggleGroup
-                    android:id="@+id/toggleLanguage"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:singleSelection="true"
-                    app:selectionRequired="true"
-                    app:checkedButton="@id/btnLangSystem">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnLangSystem"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/language_system"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnLangZh"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/language_zh"
-                        android:textSize="11sp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnLangEn"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/language_en"
-                        android:textSize="11sp" />
-                </com.google.android.material.button.MaterialButtonToggleGroup>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- SSH Server Config Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -454,6 +335,24 @@
                             android:textSize="14sp" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
+
+                <!-- Proxy username -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/hint_proxy_username"
+                    app:boxBackgroundMode="outline"
+                    app:boxStrokeColor="@color/red_accent">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etProxyUsername"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="?attr/colorOnSurface"
+                        android:inputType="text"
+                        android:text="user"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- Proxy password (optional) -->
                 <com.google.android.material.textfield.TextInputLayout

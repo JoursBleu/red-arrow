@@ -16,13 +16,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import com.redarrow.proxy.databinding.ActivityMainBinding
 import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
+import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.ui.MainViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         setupKeyFilePicker()
         setupConnectButton()
         setupSettings()
+        setupLogCard()
     }
 
     override fun onStart() {
@@ -105,59 +106,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettings() {
-        val prefs = getSharedPreferences("red_arrow_settings", Context.MODE_PRIVATE)
-
-        // Toggle settings panel visibility
         binding.btnSettings.setOnClickListener {
-            val card = binding.cardSettings
-            card.visibility = if (card.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-        }
-
-        // --- Theme toggle ---
-        val savedTheme = prefs.getString("theme", "system") ?: "system"
-        when (savedTheme) {
-            "light" -> binding.btnThemeLight.isChecked = true
-            "dark" -> binding.btnThemeDark.isChecked = true
-            else -> binding.btnThemeSystem.isChecked = true
-        }
-
-        binding.toggleTheme.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            val mode = when (checkedId) {
-                R.id.btnThemeLight -> "light"
-                R.id.btnThemeDark -> "dark"
-                else -> "system"
-            }
-            prefs.edit().putString("theme", mode).apply()
-            when (mode) {
-                "light" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
-                "dark" -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
-                else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-            }
-        }
-
-        // --- Language toggle ---
-        val savedLang = prefs.getString("language", "system") ?: "system"
-        when (savedLang) {
-            "zh" -> binding.btnLangZh.isChecked = true
-            "en" -> binding.btnLangEn.isChecked = true
-            else -> binding.btnLangSystem.isChecked = true
-        }
-
-        binding.toggleLanguage.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            val lang = when (checkedId) {
-                R.id.btnLangZh -> "zh"
-                R.id.btnLangEn -> "en"
-                else -> "system"
-            }
-            prefs.edit().putString("language", lang).apply()
-            val locales = if (lang == "system") {
-                LocaleListCompat.getEmptyLocaleList()
-            } else {
-                LocaleListCompat.forLanguageTags(lang)
-            }
-            AppCompatDelegate.setApplicationLocales(locales)
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 
@@ -185,6 +135,7 @@ class MainActivity : AppCompatActivity() {
             etKeyPassphrase.setText(config.privateKeyPassphrase)
             etSocksPort.setText(config.socksPort.toString())
             etHttpPort.setText(config.httpPort.toString())
+            etProxyUsername.setText(config.proxyUsername)
             etProxyPassword.setText(config.proxyPassword)
         }
         selectedKeyContent = config.privateKey
@@ -285,11 +236,18 @@ class MainActivity : AppCompatActivity() {
                          else ConnectionConfig.AuthMethod.PASSWORD,
             socksPort = binding.etSocksPort.text.toString().toIntOrNull() ?: 1080,
             httpPort = binding.etHttpPort.text.toString().toIntOrNull() ?: 8080,
+            proxyUsername = binding.etProxyUsername.text.toString().ifBlank { "user" },
             proxyPassword = binding.etProxyPassword.text.toString(),
         )
     }
 
     // ==================== State ====================
+
+    private fun setupLogCard() {
+        binding.btnClearLog.setOnClickListener {
+            AppLog.clear()
+        }
+    }
 
     private fun observeState() {
         lifecycleScope.launch {
@@ -300,6 +258,14 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             tunnelService?.connectionTracker?.activeConnections?.collectLatest { connections ->
                 updateConnectionsUI(connections)
+            }
+        }
+        lifecycleScope.launch {
+            AppLog.logs.collectLatest { lines ->
+                binding.tvLog.text = lines.joinToString("\n")
+                binding.scrollLog.post {
+                    binding.scrollLog.fullScroll(View.FOCUS_DOWN)
+                }
             }
         }
     }
@@ -380,6 +346,7 @@ class MainActivity : AppCompatActivity() {
             btnSelectKey.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
+            etProxyUsername.isEnabled = enabled
             etProxyPassword.isEnabled = enabled
             btnAuthPassword.isEnabled = enabled
             btnAuthKey.isEnabled = enabled

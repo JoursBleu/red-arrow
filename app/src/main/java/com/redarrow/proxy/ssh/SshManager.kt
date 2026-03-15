@@ -1,6 +1,6 @@
 package com.redarrow.proxy.ssh
 
-import android.util.Log
+import com.redarrow.proxy.util.AppLog
 import com.jcraft.jsch.ChannelDirectTCPIP
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
@@ -58,14 +58,14 @@ class SshManager {
                 timeout = 15000
             }
 
-            Log.i(TAG, "Connecting to ${config.host}:${config.port}...")
+            AppLog.i(TAG, "Connecting to ${config.host}:${config.port}...")
             newSession.connect(15000)
-            Log.i(TAG, "SSH session established")
+            AppLog.i(TAG, "SSH session established")
 
             session = newSession
             Result.success(newSession)
         } catch (e: Exception) {
-            Log.e(TAG, "Connection failed", e)
+            AppLog.e(TAG, "Connection failed", e)
             disconnect()
             Result.failure(e)
         }
@@ -85,7 +85,7 @@ class SshManager {
                 setOrgPort(0)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to open direct channel to $targetHost:$targetPort", e)
+            AppLog.e(TAG, "Failed to open direct channel to $targetHost:$targetPort", e)
             null
         }
     }
@@ -98,11 +98,11 @@ class SshManager {
             session?.let {
                 if (it.isConnected) {
                     it.disconnect()
-                    Log.i(TAG, "SSH disconnected")
+                    AppLog.i(TAG, "SSH disconnected")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error disconnecting", e)
+            AppLog.e(TAG, "Error disconnecting", e)
         } finally {
             session = null
         }

@@ -60,5 +60,10 @@
     <string name="notif_connected">已连接 %s</string>
     <string name="error_proxy_start_failed">代理服务器启动失败: %s</string>
     <string name="error_connect_failed">连接失败</string>
+    <string name="hint_proxy_username">代理用户名</string>
     <string name="hint_proxy_password">代理密码（可选，留空则不鉴权）</string>
+    <string name="about">关于</string>
+    <string name="version_label">版本</string>
+    <string name="author_label">作者</string>
+    <string name="license_label">许可证</string>
 </resources>

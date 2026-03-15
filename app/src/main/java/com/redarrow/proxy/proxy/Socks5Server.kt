@@ -1,6 +1,6 @@
 package com.redarrow.proxy.proxy
 
-import android.util.Log
+import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.ssh.SshManager
 import java.io.IOException
@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class Socks5Server(
     private val sshManager: SshManager,
     private val port: Int,
+    private val proxyUsername: String = "user",
     private val proxyPassword: String = "",
     private val tracker: ConnectionTracker? = null,
 ) {
@@ -40,7 +41,7 @@ class Socks5Server(
 
         executor = Executors.newCachedThreadPool()
         serverSocket = ServerSocket(port, 50, java.net.InetAddress.getByName("0.0.0.0"))
-        Log.i(TAG, "SOCKS5 server started on 0.0.0.0:$port")
+        AppLog.i(TAG, "SOCKS5 server started on 0.0.0.0:$port")
 
         Thread({
             while (running.get()) {
@@ -48,9 +49,9 @@ class Socks5Server(
                     val client = serverSocket?.accept() ?: break
                     executor?.submit { handleClient(client) }
                 } catch (e: SocketException) {
-                    if (running.get()) Log.e(TAG, "Accept error", e)
+                    if (running.get()) AppLog.e(TAG, "Accept error", e)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Accept error", e)
+                    AppLog.e(TAG, "Accept error", e)
                 }
             }
         }, "socks5-accept").start()
@@ -62,7 +63,7 @@ class Socks5Server(
         executor?.shutdownNow()
         serverSocket = null
         executor = null
-        Log.i(TAG, "SOCKS5 server stopped")
+        AppLog.i(TAG, "SOCKS5 server stopped")
     }
 
     private fun handleClient(client: Socket) {
@@ -83,7 +84,7 @@ class Socks5Server(
                 return
             }
 
-            Log.d(TAG, "CONNECT ${request.host}:${request.port}")
+            AppLog.d(TAG, "CONNECT ${request.host}:${request.port}")
 
             // 注册连接
             val clientIp = client.inetAddress.hostAddress ?: "unknown"
@@ -105,7 +106,7 @@ class Socks5Server(
             try {
                 channel.connect(10000)
             } catch (e: Exception) {
-                Log.e(TAG, "Channel connect failed: ${request.host}:${request.port}", e)
+                AppLog.e(TAG, "Channel connect failed: ${request.host}:${request.port}", e)
                 sendReply(output, 0x05)
                 client.close()
                 return
@@ -124,7 +125,7 @@ class Socks5Server(
 
             channel.disconnect()
         } catch (e: Exception) {
-            Log.e(TAG, "Client handler error", e)
+            AppLog.e(TAG, "Client handler error", e)
         } finally {
             connId?.let { tracker?.remove(it) }
             try { client.close() } catch (_: Exception) {}
@@ -159,11 +160,12 @@ class Socks5Server(
             val pBytes = ByteArray(pLen)
             input.readFully(pBytes)
             val clientPassword = String(pBytes)
+            val clientUsername = String(uBytes)
 
-            if (clientPassword != proxyPassword) {
+            if (clientUsername != proxyUsername || clientPassword != proxyPassword) {
                 output.write(byteArrayOf(0x01, 0x01))
                 output.flush()
-                Log.w(TAG, "SOCKS5 auth failed")
+                AppLog.w(TAG, "SOCKS5 auth failed")
                 return false
             }
             output.write(byteArrayOf(0x01, 0x00))

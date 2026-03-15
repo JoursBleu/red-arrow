@@ -10,7 +10,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
-import android.util.Log
+import com.redarrow.proxy.util.AppLog
 import androidx.core.app.NotificationCompat
 import com.redarrow.proxy.MainActivity
 import com.redarrow.proxy.R
@@ -80,8 +80,8 @@ class TunnelService : Service() {
             result.fold(
                 onSuccess = {
                     try {
-                        socksServer = Socks5Server(sshManager, config.socksPort, config.proxyPassword, connectionTracker).also { it.start() }
-                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort, config.proxyPassword, connectionTracker).also { it.start() }
+                        socksServer = Socks5Server(sshManager, config.socksPort, config.proxyUsername, config.proxyPassword, connectionTracker).also { it.start() }
+                        httpProxyServer = HttpProxyServer(sshManager, config.httpPort, config.proxyUsername, config.proxyPassword, connectionTracker).also { it.start() }
 
                         _state.value = TunnelState(
                             status = TunnelState.Status.CONNECTED,
@@ -91,9 +91,9 @@ class TunnelService : Service() {
                             connectedAt = System.currentTimeMillis(),
                         )
                         updateNotification(getString(R.string.notif_connected, config.host))
-                        Log.i(TAG, "Tunnel active: SOCKS5=:${config.socksPort} HTTP=:${config.httpPort}")
+                        AppLog.i(TAG, "Tunnel active: SOCKS5=:${config.socksPort} HTTP=:${config.httpPort}")
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to start proxy servers", e)
+                        AppLog.e(TAG, "Failed to start proxy servers", e)
                         sshManager.disconnect()
                         _state.value = TunnelState(
                             status = TunnelState.Status.ERROR,
