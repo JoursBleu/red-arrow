@@ -12,16 +12,19 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.OpenableColumns
 import android.view.View
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.redarrow.proxy.databinding.ActivityMainBinding
 import com.redarrow.proxy.model.ConnectionConfig
 import com.redarrow.proxy.model.ProxyConnection
 import com.redarrow.proxy.model.TunnelState
 import com.redarrow.proxy.service.TunnelService
+import com.redarrow.proxy.ssh.KeyManager
 import com.redarrow.proxy.util.AppLog
 import com.redarrow.proxy.ui.MainViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -166,6 +169,81 @@ class MainActivity : AppCompatActivity() {
     private fun setupKeyFilePicker() {
         binding.btnSelectKey.setOnClickListener {
             keyFileLauncher.launch(arrayOf("*/*"))
+        }
+
+        binding.btnGenerateKey.setOnClickListener {
+            showGenerateKeyDialog()
+        }
+
+        binding.btnSendPubKey.setOnClickListener {
+            sendPublicKeyToServer()
+        }
+    }
+
+    private fun showGenerateKeyDialog() {
+        val types = arrayOf("Ed25519", "RSA (4096)")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.key_type_title))
+            .setItems(types) { _, which ->
+                val passphrase = binding.etKeyPassphrase.text.toString()
+                try {
+                    val (privKey, pubKey) = when (which) {
+                        0 -> KeyManager.generateEd25519(passphrase)
+                        else -> KeyManager.generateRSA(passphrase)
+                    }
+                    selectedKeyContent = privKey
+                    selectedKeyFileName = if (which == 0) "ed25519_red-arrow" else "rsa_red-arrow"
+                    binding.tvKeyFileName.text = selectedKeyFileName
+                    Toast.makeText(this,
+                        getString(R.string.key_generated, selectedKeyFileName),
+                        Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    binding.tvError.apply {
+                        text = e.message
+                        visibility = View.VISIBLE
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun sendPublicKeyToServer() {
+        if (selectedKeyContent.isBlank()) {
+            Toast.makeText(this, getString(R.string.error_no_key), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val host = binding.etHost.text.toString().trim()
+        val username = binding.etUsername.text.toString().trim()
+        if (host.isBlank() || username.isBlank()) {
+            Toast.makeText(this, getString(R.string.error_fill_server), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val config = buildConfig()
+        Toast.makeText(this, getString(R.string.sending_pubkey), Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch {
+            try {
+                val passphrase = binding.etKeyPassphrase.text.toString()
+                val pubKey = KeyManager.extractPublicKey(selectedKeyContent, passphrase)
+                val result = KeyManager.sendPublicKey(config, pubKey)
+                result.fold(
+                    onSuccess = {
+                        Toast.makeText(this@MainActivity,
+                            getString(R.string.pubkey_sent), Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { e ->
+                        Toast.makeText(this@MainActivity,
+                            getString(R.string.pubkey_send_failed, e.message),
+                            Toast.LENGTH_LONG).show()
+                    }
+                )
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity,
+                    getString(R.string.pubkey_send_failed, e.message),
+                    Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -348,6 +426,8 @@ class MainActivity : AppCompatActivity() {
             etPassword.isEnabled = enabled
             etKeyPassphrase.isEnabled = enabled
             btnSelectKey.isEnabled = enabled
+            btnGenerateKey.isEnabled = enabled
+            btnSendPubKey.isEnabled = enabled
             etSocksPort.isEnabled = enabled
             etHttpPort.isEnabled = enabled
             etProxyUsername.isEnabled = enabled

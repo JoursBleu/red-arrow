@@ -66,4 +66,13 @@
     <string name="version_label">版本</string>
     <string name="author_label">作者</string>
     <string name="license_label">许可证</string>
+    <string name="btn_generate_key">生成密钥</string>
+    <string name="btn_send_pubkey">发送公钥</string>
+    <string name="key_type_title">密钥类型</string>
+    <string name="key_generated">密钥已生成: %s</string>
+    <string name="pubkey_sent">公钥已发送到服务器</string>
+    <string name="pubkey_send_failed">发送公钥失败: %s</string>
+    <string name="error_no_key">未加载私钥</string>
+    <string name="error_fill_server">请先填写服务器信息</string>
+    <string name="sending_pubkey">正在发送公钥…</string>
 </resources>

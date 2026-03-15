@@ -66,4 +66,13 @@
     <string name="version_label">Version</string>
     <string name="author_label">Author</string>
     <string name="license_label">License</string>
+    <string name="btn_generate_key">Generate Key</string>
+    <string name="btn_send_pubkey">Send Public Key</string>
+    <string name="key_type_title">Key Type</string>
+    <string name="key_generated">Key generated: %s</string>
+    <string name="pubkey_sent">Public key sent to server</string>
+    <string name="pubkey_send_failed">Failed to send public key: %s</string>
+    <string name="error_no_key">No private key loaded</string>
+    <string name="error_fill_server">Please fill in server info first</string>
+    <string name="sending_pubkey">Sending public key…</string>
 </resources>
