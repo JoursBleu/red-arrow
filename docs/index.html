@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="google-site-verification" content="AWl1KvffncWtkBzHG9EkyPN5bxQRxne9-5xpV5tN_DY" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Red Arrow — Android SSH Tunnel Proxy</title>
-    <meta name="description" content="Red Arrow is an open-source Android app that creates local SOCKS5 and HTTP proxies over an SSH tunnel.">
-    <meta name="keywords" content="Android, SSH, tunnel, SOCKS5, HTTP proxy, open source, Red Arrow">
-    <meta property="og:title" content="Red Arrow — Android SSH Tunnel Proxy">
-    <meta property="og:description" content="Open-source Android app for SSH tunneling with SOCKS5/HTTP proxy support.">
+    <title>Red Arrow — SSH Tunnel Proxy for Android &amp; Windows</title>
+    <meta name="description" content="Red Arrow is an open-source SSH tunnel proxy for Android and Windows, with local SOCKS5/HTTP proxies and Windows system-proxy routing.">
+    <meta name="keywords" content="Android, Windows, SSH, tunnel, SOCKS5, HTTP proxy, system proxy, open source, Red Arrow">
+    <meta property="og:title" content="Red Arrow — SSH Tunnel Proxy for Android &amp; Windows">
+    <meta property="og:description" content="Open-source SSH tunneling with SOCKS5 and HTTP proxy support for Android and Windows.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://joursbleu.github.io/red-arrow/">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏹</text></svg>">
@@ -48,7 +48,7 @@
             line-height: 1.6;
             min-height: 100vh;
         }
-        .container { max-width: 800px; margin: 0 auto; padding: 0 24px; }
+        .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
 
         /* ===== Language: class on <html> controls visibility ===== */
         html.lang-en .zh { display: none !important; }
@@ -91,6 +91,52 @@
             text-decoration: none; transition: color 0.15s;
         }
         .btn-text:hover { color: var(--accent2); }
+
+        .platforms {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 28px;
+        }
+        .platform {
+            text-align: left;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 1px 4px var(--shadow);
+        }
+        .platform h3 { margin-bottom: 6px; }
+        .platform p { color: var(--text2); font-size: 0.9rem; margin-bottom: 14px; }
+        .platform-badge {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            color: var(--accent2);
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .screenshot-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        .screenshot-grid.android { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .screenshot-grid img {
+            display: block;
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .screenshot-caption {
+            margin-top: 6px;
+            text-align: center;
+            color: var(--text2);
+            font-size: 0.85rem;
+        }
 
         /* Features */
         .features {
@@ -168,6 +214,13 @@
         .lang-switch a { color: var(--text2); text-decoration: none; cursor: pointer; }
         .lang-switch a.active { color: var(--accent2); font-weight: 600; }
         .lang-switch span { color: var(--border); margin: 0 6px; }
+
+        @media (max-width: 680px) {
+            .hero { padding-top: 72px; }
+            .hero h1 { font-size: 2rem; }
+            .platforms, .screenshot-grid, .screenshot-grid.android { grid-template-columns: 1fr; }
+            .btn { width: 100%; justify-content: center; }
+        }
     </style>
 </head>
 <body>
@@ -181,20 +234,35 @@
         <section class="hero">
             <div class="hero-icon">🏹</div>
             <h1>Red Arrow</h1>
-            <p class="en">An open-source Android app that creates local SOCKS5 and HTTP proxies over an encrypted SSH tunnel.</p>
-            <p class="zh">一款开源 Android 应用，通过 SSH 加密隧道在本地创建 SOCKS5 和 HTTP 代理。</p>
+            <p class="en">Open-source SSH tunneling with local SOCKS5 and HTTP proxies for Android and Windows.</p>
+            <p class="zh">面向 Android 与 Windows 的开源 SSH 隧道客户端，提供本地 SOCKS5 和 HTTP 代理。</p>
             <div class="btn-group">
-                <a href="https://github.com/JoursBleu/red-arrow/releases/download/v0.1.0-beta/red-arrow-v0.1.0-beta.apk" class="btn btn-primary">
-                    ⬇ <span class="en">Download v0.1.0-beta</span><span class="zh">下载 v0.1.0-beta</span>
+                <a href="https://github.com/JoursBleu/red-arrow/releases/download/windows-v1.2.2/RedArrow-Windows-Setup-1.2.2-x64.exe" class="btn btn-primary">
+                    <span class="en">Download for Windows 1.2.2</span><span class="zh">下载 Windows 1.2.2</span>
                 </a>
-                <a href="https://github.com/JoursBleu/red-arrow" class="btn btn-secondary">
-                    ☆ GitHub
+                <a href="https://github.com/JoursBleu/red-arrow/releases/download/v0.1.0-beta/app-debug.apk" class="btn btn-secondary">
+                    <span class="en">Download Android beta</span><span class="zh">下载 Android 测试版</span>
                 </a>
             </div>
             <div class="btn-group" style="margin-top: 8px;">
+                <a href="https://github.com/JoursBleu/red-arrow" class="btn-text">GitHub →</a>
                 <a href="https://github.com/JoursBleu/red-arrow/releases" class="btn-text">
                     <span class="en">All Releases →</span><span class="zh">历史版本 →</span>
                 </a>
+            </div>
+            <div class="platforms">
+                <div class="platform">
+                    <span class="platform-badge">Windows 10/11 x64</span>
+                    <h3><span class="en">Windows control center</span><span class="zh">Windows 控制中心</span></h3>
+                    <p class="en">System-proxy modes, mainland China bypass rules, optional ProxyJump, Ed25519 key generation, tray controls, and automatic proxy restoration.</p>
+                    <p class="zh">支持系统代理模式、中国大陆分流、可选 ProxyJump、Ed25519 密钥生成、托盘控制和原代理设置恢复。</p>
+                </div>
+                <div class="platform">
+                    <span class="platform-badge">Android 8.0+</span>
+                    <h3><span class="en">Android foreground service</span><span class="zh">Android 前台服务</span></h3>
+                    <p class="en">Password or key authentication, LAN-shareable proxies, key management, traffic counters, connection tracking, and automatic reconnection.</p>
+                    <p class="zh">支持密码或密钥认证、局域网共享、密钥管理、流量统计、连接追踪和断线重连。</p>
+                </div>
             </div>
         </section>
 
@@ -203,21 +271,33 @@
         <section class="section">
             <h2 class="en">Screenshots</h2>
             <h2 class="zh">应用截图</h2>
-            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+            <h3 style="margin-bottom:12px"><span class="en">Windows</span><span class="zh">Windows</span></h3>
+            <div class="screenshot-grid">
+                <div>
+                    <img src="windows-overview.png" alt="Red Arrow Windows overview">
+                    <p class="screenshot-caption"><span class="en">Overview and proxy modes</span><span class="zh">概览与代理模式</span></p>
+                </div>
+                <div>
+                    <img src="windows-server.png" alt="Red Arrow Windows server settings">
+                    <p class="screenshot-caption"><span class="en">SSH server and key controls</span><span class="zh">SSH 服务器与密钥管理</span></p>
+                </div>
+            </div>
+            <h3 style="margin:28px 0 12px"><span class="en">Android</span><span class="zh">Android</span></h3>
+            <div class="screenshot-grid android">
                 <div style="text-align:center">
-                    <img class="en" src="home_en.jpg" alt="Home" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <img class="zh" src="home_cn.jpg" alt="首页" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <p style="margin-top:6px; font-size:0.85rem; color:var(--text2)"><span class="en">Home</span><span class="zh">首页</span></p>
+                    <img class="en" src="home_en.jpg" alt="Home">
+                    <img class="zh" src="home_cn.jpg" alt="首页">
+                    <p class="screenshot-caption"><span class="en">Home</span><span class="zh">首页</span></p>
                 </div>
                 <div style="text-align:center">
-                    <img class="en" src="keys_en.jpg" alt="Keys" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <img class="zh" src="keys_cn.jpg" alt="密钥" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <p style="margin-top:6px; font-size:0.85rem; color:var(--text2)"><span class="en">Keys</span><span class="zh">密钥</span></p>
+                    <img class="en" src="keys_en.jpg" alt="Keys">
+                    <img class="zh" src="keys_cn.jpg" alt="密钥">
+                    <p class="screenshot-caption"><span class="en">Keys</span><span class="zh">密钥</span></p>
                 </div>
                 <div style="text-align:center">
-                    <img class="en" src="settings_en.jpg" alt="Settings" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <img class="zh" src="settings_cn.jpg" alt="设置" style="width:100%; border-radius:12px; border:1px solid var(--border);">
-                    <p style="margin-top:6px; font-size:0.85rem; color:var(--text2)"><span class="en">Settings</span><span class="zh">设置</span></p>
+                    <img class="en" src="settings_en.jpg" alt="Settings">
+                    <img class="zh" src="settings_cn.jpg" alt="设置">
+                    <p class="screenshot-caption"><span class="en">Settings</span><span class="zh">设置</span></p>
                 </div>
             </div>
         </section>
@@ -233,15 +313,15 @@
                 <div class="feature-icon">🌐</div>
                 <h3 class="en">Dual Proxy</h3>
                 <h3 class="zh">双代理</h3>
-                <p class="en">SOCKS5 (:1080) + HTTP (:8080) on 0.0.0.0, share with LAN devices</p>
-                <p class="zh">SOCKS5 (:1080) + HTTP (:8080) 监听 0.0.0.0，局域网设备共享</p>
+                <p class="en">SOCKS5 + HTTP on both platforms; Windows can manage the signed-in user's system proxy</p>
+                <p class="zh">双平台提供 SOCKS5 + HTTP；Windows 可自动接管当前用户系统代理</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">🔑</div>
                 <h3 class="en">Key Management</h3>
                 <h3 class="zh">密钥管理</h3>
-                <p class="en">Generate Ed25519/RSA, import keys, send pubkey to server</p>
-                <p class="zh">生成 Ed25519/RSA 密钥对，导入私钥，发送公钥到服务器</p>
+                <p class="en">Generate Ed25519 keys, import existing keys, and copy or install public keys</p>
+                <p class="zh">生成 Ed25519 密钥、导入已有私钥，并复制或安装公钥</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">🔄</div>
@@ -252,17 +332,17 @@
             </div>
             <div class="feature">
                 <div class="feature-icon">📊</div>
-                <h3 class="en">Traffic Stats</h3>
-                <h3 class="zh">流量统计</h3>
-                <p class="en">Real-time upload/download counters and connection tracking</p>
-                <p class="zh">实时上传下载计数 + 活跃连接按 IP 分组显示</p>
+                <h3 class="en">Smart Routing</h3>
+                <h3 class="zh">智能分流</h3>
+                <p class="en">Windows global, local-only, or mainland-China-bypass modes with custom rules</p>
+                <p class="zh">Windows 支持全局、仅本地及绕过中国大陆模式，并可自定义规则</p>
             </div>
             <div class="feature">
                 <div class="feature-icon">🎨</div>
-                <h3 class="en">Material Design 3</h3>
-                <h3 class="zh">Material Design 3</h3>
-                <p class="en">Light/Dark/System theme, Chinese &amp; English i18n</p>
-                <p class="zh">浅色/深色/跟随系统主题，中英双语</p>
+                <h3 class="en">Native Controls</h3>
+                <h3 class="zh">原生控制</h3>
+                <p class="en">Android Material Design 3 and a native Windows control center with tray integration</p>
+                <p class="zh">Android Material Design 3 与带托盘集成的 Windows 原生控制中心</p>
             </div>
         </section>
 
@@ -272,23 +352,23 @@
             <ol class="steps">
                 <li>
                     <strong class="en">Install</strong><strong class="zh">安装</strong><br>
-                    <span class="en">Download APK from GitHub Releases</span>
-                    <span class="zh">从 GitHub Releases 下载 APK</span>
+                    <span class="en">Download the Windows installer or Android APK from GitHub Releases</span>
+                    <span class="zh">从 GitHub Releases 下载 Windows 安装器或 Android APK</span>
                 </li>
                 <li>
                     <strong class="en">Configure</strong><strong class="zh">配置</strong><br>
-                    <span class="en">Enter SSH server host, port, username, and choose auth method</span>
-                    <span class="zh">填写 SSH 服务器地址、端口、用户名，选择认证方式</span>
+                    <span class="en">Enter your SSH host, port, user, and key; ProxyJump is optional</span>
+                    <span class="zh">填写 SSH 地址、端口、用户和密钥；ProxyJump 可留空</span>
                 </li>
                 <li>
                     <strong class="en">Connect</strong><strong class="zh">连接</strong><br>
-                    <span class="en">Tap Connect — SOCKS5 and HTTP proxies start instantly</span>
-                    <span class="zh">点击连接 — SOCKS5 和 HTTP 代理立即启动</span>
+                    <span class="en">Connect, then choose local-only, global, or mainland-China-bypass mode on Windows</span>
+                    <span class="zh">连接后，Windows 可选择仅本地、全局或绕过中国大陆模式</span>
                 </li>
                 <li>
                     <strong class="en">Use</strong><strong class="zh">使用</strong><br>
-                    <span class="en">Set your phone or LAN devices to use the proxy address</span>
-                    <span class="zh">在手机或局域网设备上设置代理地址即可使用</span>
+                    <span class="en">Windows configures WinINET automatically; Android can share its proxy over the LAN</span>
+                    <span class="zh">Windows 自动配置 WinINET；Android 可将代理共享给局域网设备</span>
                 </li>
             </ol>
         </section>
@@ -297,9 +377,8 @@
             <h2 class="en">Tech Stack</h2>
             <h2 class="zh">技术栈</h2>
             <pre>
-Kotlin  ·  Material Design 3  ·  ViewBinding
-JSch 0.2.18  ·  Coroutines + StateFlow
-Gradle 8.7  ·  AGP 8.5.2  ·  compileSdk 35  ·  minSdk 26</pre>
+Android: Kotlin · Material Design 3 · JSch · Coroutines
+Windows: Rust · OpenSSH · WinForms · WinINET · Inno Setup</pre>
         </section>
 
         <footer>

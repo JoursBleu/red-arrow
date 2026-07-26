@@ -1,0 +1,71 @@
+name: Windows Release
+
+on:
+  push:
+    tags:
+      - "windows-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+        working-directory: windows
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Verify tag version
+        run: |
+          $packageVersion = (Select-String '^version = "([^"]+)"' Cargo.toml).Matches.Groups[1].Value
+          $tagVersion = '${{ github.ref_name }}' -replace '^windows-v', ''
+          if ($packageVersion -ne $tagVersion) {
+            throw "Tag version $tagVersion does not match Cargo.toml version $packageVersion."
+          }
+
+      - name: Build installer and portable package
+        run: .\build.ps1
+
+      - name: Test portable package
+        run: .\tests\portable-smoke.ps1
+
+      - name: Create GitHub Release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $version = '${{ github.ref_name }}' -replace '^windows-v', ''
+          $notes = @"
+          Red Arrow for Windows $version
+
+          - Native Windows control center and notification-area integration
+          - SSH dynamic tunnel with local SOCKS5 and HTTP proxies
+          - System proxy modes: local only, global, and bypass mainland China
+          - Optional ProxyJump and Ed25519 key generation
+          - Automatic restoration of previous WinINET proxy/PAC settings
+
+          Defaults: SOCKS5 127.0.0.1:1080 and HTTP 127.0.0.1:8118.
+
+          The installer is unsigned, so Windows SmartScreen may show an unknown-publisher warning.
+          "@
+          gh release create '${{ github.ref_name }}' `
+            windows/dist/RedArrow-Windows-Setup-$version-x64.exe `
+            windows/dist/RedArrow-Windows-Portable-$version-x64.zip `
+            windows/dist/RedArrow.exe `
+            windows/dist/SHA256SUMS.txt `
+            --title "Red Arrow for Windows $version" `
+            --notes $notes

@@ -1,0 +1,17 @@
+[package]
+name = "red-arrow-windows"
+version = "1.2.2"
+edition = "2021"
+description = "Red Arrow for Windows: SSH tunnel with SOCKS5, HTTP, and system proxy modes"
+
+[dependencies]
+ipnet = "2.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

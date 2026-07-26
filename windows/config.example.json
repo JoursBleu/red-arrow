@@ -1,0 +1,20 @@
+{
+  "ssh_host": "ssh.example.com",
+  "ssh_port": 22,
+  "ssh_user": "username",
+  "identity_file": "",
+  "proxy_jump": null,
+  "socks_bind": "127.0.0.1",
+  "socks_port": 1080,
+  "http_bind": "127.0.0.1",
+  "http_port": 8118,
+  "connect_timeout_seconds": 10,
+  "server_alive_interval_seconds": 30,
+  "reconnect_delay_seconds": 3,
+  "log_file": "%LOCALAPPDATA%\\RedArrow\\proxy.log",
+  "system_proxy_mode": "bypass_cn",
+  "cn_rules_files": ["rules\\china.txt", "rules\\china6.txt"],
+  "direct_domains": [".cn"],
+  "direct_cidrs": [],
+  "force_proxy_domains": []
+}
