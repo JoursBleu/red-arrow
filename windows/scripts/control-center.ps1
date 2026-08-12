@@ -306,6 +306,16 @@ function Get-SshProcess {
         Select-Object -First 1
 }
 
+function Test-ListenerReady {
+    param([string]$Address, [int]$Port)
+    return $null -ne (Get-NetTCPConnection `
+        -State Listen `
+        -LocalAddress $Address `
+        -LocalPort $Port `
+        -ErrorAction SilentlyContinue |
+        Select-Object -First 1)
+}
+
 function Assert-ListenerPortAvailable {
     param([int]$Port, [string]$Label)
     $listener = Get-NetTCPConnection `
@@ -567,11 +577,13 @@ function Refresh-Log {
 function Refresh-Status {
     $core = Get-CoreProcess
     $ssh = Get-SshProcess
+    $httpReady = Test-ListenerReady -Address '127.0.0.1' -Port ([int]$httpPortInput.Value)
+    $socksReady = Test-ListenerReady -Address '127.0.0.1' -Port ([int]$socksPortInput.Value)
     $settings = Get-ItemProperty $internetSettingsPath -ErrorAction SilentlyContinue
     $proxyEnabled = $settings -and [int]$settings.ProxyEnable -eq 1
     $proxyAddress = if ($proxyEnabled) { [string]$settings.ProxyServer } else { 'Off' }
 
-    if ($core -and $ssh) {
+    if ($core -and $ssh -and $httpReady -and $socksReady) {
         $connectionStatus.Text = '  Connected  '
         $connectionStatus.BackColor = $colors.SoftGreen
         $connectionStatus.ForeColor = $colors.Green
@@ -926,15 +938,39 @@ $testButton.Add_Click({
         $testButton.Enabled = $false
         $bottomStatus.Text = 'Testing HTTP proxy...'
         [System.Windows.Forms.Application]::DoEvents()
+        $httpReady = Test-ListenerReady -Address '127.0.0.1' -Port ([int]$httpPortInput.Value)
+        $socksReady = Test-ListenerReady -Address '127.0.0.1' -Port ([int]$socksPortInput.Value)
+        if (-not $httpReady) {
+            throw 'The local HTTP proxy is not running. Click Connect and check Logs.'
+        }
+        if (-not $socksReady) {
+            throw 'The SSH tunnel is not ready. Check the SSH server, network, key, and Logs.'
+        }
         $result = & curl.exe `
-            -fsS `
+            -sS `
             --ssl-no-revoke `
             --connect-timeout 8 `
             --max-time 15 `
+            --write-out "`n%{http_code}" `
             -x "http://127.0.0.1:$([int]$httpPortInput.Value)" `
-            https://api.ipify.org
-        if ($LASTEXITCODE -ne 0) { throw "curl exited with code $LASTEXITCODE" }
-        $bottomStatus.Text = "Proxy is working. Exit IP: $(([string]$result).Trim())"
+            https://api64.ipify.org 2>&1
+        $curlExitCode = $LASTEXITCODE
+        $lines = @($result)
+        $httpStatus = if ($lines.Count) { [string]$lines[-1] } else { '' }
+        $responseBody = if ($lines.Count -gt 1) {
+            (($lines[0..($lines.Count - 2)] | ForEach-Object { [string]$_ }) -join "`n").Trim()
+        }
+        else { '' }
+        if ($curlExitCode -ne 0) {
+            throw "curl failed with code $curlExitCode. $responseBody"
+        }
+        if ($httpStatus -ne '200') {
+            throw "The IP check service returned HTTP $httpStatus. $responseBody"
+        }
+        if ($responseBody -notmatch '^[0-9a-fA-F:.]+$') {
+            throw "The IP check service returned an unexpected response: $responseBody"
+        }
+        $bottomStatus.Text = "Proxy is working. Exit IP: $responseBody"
         $bottomStatus.ForeColor = $colors.Green
     }
     catch {
