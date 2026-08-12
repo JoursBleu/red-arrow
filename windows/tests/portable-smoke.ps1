@@ -14,6 +14,7 @@ try {
     Expand-Archive -Path $PackagePath -DestinationPath $auditDir -Force
     $required = @(
         'RedArrow.exe',
+        'control-center-hidden.vbs',
         'control-center.ps1',
         'start-proxy.ps1',
         'stop-proxy.ps1',

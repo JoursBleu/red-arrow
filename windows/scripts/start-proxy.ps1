@@ -4,13 +4,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $executable = Join-Path $PSScriptRoot 'RedArrow.exe'
-$controlCenterScript = Join-Path $PSScriptRoot 'control-center.ps1'
+$controlCenterLauncher = Join-Path $PSScriptRoot 'control-center-hidden.vbs'
 $systemProxyScript = Join-Path $PSScriptRoot 'system-proxy.ps1'
 
 if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
     Start-Process `
-        -FilePath "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" `
-        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', $controlCenterScript)
+        -FilePath "$env:WINDIR\System32\wscript.exe" `
+        -ArgumentList @('"' + $controlCenterLauncher + '"') `
+        -WindowStyle Hidden
     exit 0
 }
 

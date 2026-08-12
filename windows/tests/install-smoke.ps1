@@ -41,6 +41,7 @@ try {
 
     $required = @(
         'RedArrow.exe',
+        'control-center-hidden.vbs',
         'start-hidden.vbs',
         'start-proxy.ps1',
         'stop-proxy.ps1',
