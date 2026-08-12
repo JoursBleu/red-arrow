@@ -1,6 +1,5 @@
 param(
     [switch]$SmokeTest,
-    [switch]$KeygenSmokeTest,
     [switch]$ConfigSerializationSmokeTest,
     [switch]$ConfigRoundTripSmokeTest,
     [string]$ScreenshotPath,
@@ -49,11 +48,7 @@ $colors = @{
 }
 
 $defaults = [ordered]@{
-    ssh_host = ''
-    ssh_port = 22
-    ssh_user = ''
-    identity_file = ''
-    proxy_jump = $null
+    ssh_target = ''
     socks_bind = '127.0.0.1'
     socks_port = 1080
     http_bind = '127.0.0.1'
@@ -206,6 +201,7 @@ if ($ConfigSerializationSmokeTest) {
     [string[]]$directCidrs = ConvertTo-StringArray (Split-Rules '')
     [string[]]$forceProxyDomains = ConvertTo-StringArray (Split-Rules '')
     $probe = [ordered]@{
+        ssh_target = 'red-arrow-tunnel'
         cn_rules_files = [string[]]@('rules\china.txt', 'rules\china6.txt')
         direct_domains = $directDomains
         direct_cidrs = $directCidrs
@@ -213,7 +209,8 @@ if ($ConfigSerializationSmokeTest) {
     }
     $json = $probe | ConvertTo-Json -Depth 4 -Compress
     $roundTrip = $json | ConvertFrom-Json
-    if ($roundTrip.direct_domains -isnot [System.Array] -or
+    if ($roundTrip.ssh_target -ne 'red-arrow-tunnel' -or
+        $roundTrip.direct_domains -isnot [System.Array] -or
         @($roundTrip.direct_domains).Count -ne 1 -or
         $roundTrip.direct_cidrs -isnot [System.Array] -or
         @($roundTrip.direct_cidrs).Count -ne 0 -or
@@ -228,17 +225,17 @@ if ($ConfigSerializationSmokeTest) {
 if ($ConfigRoundTripSmokeTest) {
     $testDirectory = Join-Path $env:TEMP ('RedArrow-config-smoke-' + [Guid]::NewGuid().ToString('N'))
     $testConfig = Join-Path $testDirectory 'config.candidate.json'
+    $smokeRulesDirectory = Join-Path $appDir 'rules'
+    if (-not (Test-Path $smokeRulesDirectory -PathType Container)) {
+        $smokeRulesDirectory = Join-Path (Split-Path $appDir -Parent) 'rules'
+    }
     try {
         New-Item -ItemType Directory -Force $testDirectory | Out-Null
         [string[]]$directDomains = ConvertTo-StringArray (Split-Rules '.cn')
         [string[]]$directCidrs = ConvertTo-StringArray (Split-Rules '')
         [string[]]$forceProxyDomains = ConvertTo-StringArray (Split-Rules '')
         $probe = [ordered]@{
-            ssh_host = 'ssh.example.com'
-            ssh_port = 22
-            ssh_user = 'username'
-            identity_file = ''
-            proxy_jump = $null
+            ssh_target = 'red-arrow-tunnel'
             socks_bind = '127.0.0.1'
             socks_port = 1080
             http_bind = '127.0.0.1'
@@ -248,7 +245,10 @@ if ($ConfigRoundTripSmokeTest) {
             reconnect_delay_seconds = 3
             log_file = (Join-Path $testDirectory 'proxy.log')
             system_proxy_mode = 'bypass_cn'
-            cn_rules_files = [string[]]@('rules\china.txt', 'rules\china6.txt')
+            cn_rules_files = [string[]]@(
+                (Join-Path $smokeRulesDirectory 'china.txt'),
+                (Join-Path $smokeRulesDirectory 'china6.txt')
+            )
             direct_domains = $directDomains
             direct_cidrs = $directCidrs
             force_proxy_domains = $forceProxyDomains
@@ -338,85 +338,6 @@ function Assert-ListenerPortAvailable {
     throw "$Label port $Port is already used by $processName. Choose another port."
 }
 
-function Invoke-Ed25519Keygen {
-    param([Parameter(Mandatory = $true)][string]$KeyPath)
-
-    $keygen = Join-Path $env:WINDIR 'System32\OpenSSH\ssh-keygen.exe'
-    if (-not (Test-Path $keygen -PathType Leaf)) {
-        throw 'Windows OpenSSH Client is required to generate a key.'
-    }
-    if ((Test-Path -LiteralPath $KeyPath) -or (Test-Path -LiteralPath ($KeyPath + '.pub'))) {
-        throw 'The private or public key file already exists. Choose a different name.'
-    }
-    $parentDirectory = Split-Path -Parent $KeyPath
-    if ($parentDirectory) {
-        New-Item -ItemType Directory -Force $parentDirectory | Out-Null
-    }
-
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $keygen
-    $startInfo.Arguments = (
-        '-q -t ed25519 -a 64 -N "" -C "Red Arrow" -f "{0}"' -f $KeyPath.Replace('"', '\"')
-    )
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
-    $process.WaitForExit()
-    if ($process.ExitCode -ne 0 -or
-        -not (Test-Path -LiteralPath $KeyPath -PathType Leaf) -or
-        -not (Test-Path -LiteralPath ($KeyPath + '.pub') -PathType Leaf)) {
-        Remove-Item -Force $KeyPath, ($KeyPath + '.pub') -ErrorAction SilentlyContinue
-        $detail = (($stderr, $stdout) | Where-Object { $_ }) -join "`r`n"
-        throw "ssh-keygen failed. $detail"
-    }
-    return $KeyPath
-}
-
-function Generate-Ed25519Key {
-    $confirmation = [System.Windows.Forms.MessageBox]::Show(
-        "Red Arrow will create a dedicated Ed25519 private key without a passphrase so it can connect automatically at sign-in.`r`n`r`nUse this key only for the intended SSH account and protect the private key file.`r`n`r`nContinue?",
-        'Generate SSH key',
-        'YesNo',
-        'Warning'
-    )
-    if ($confirmation -ne 'Yes') { return $null }
-
-    $sshDirectory = Join-Path $env:USERPROFILE '.ssh'
-    New-Item -ItemType Directory -Force $sshDirectory | Out-Null
-    $dialog = New-Object System.Windows.Forms.SaveFileDialog
-    $dialog.Title = 'Save a new Red Arrow Ed25519 private key'
-    $dialog.InitialDirectory = $sshDirectory
-    $dialog.FileName = 'red_arrow_ed25519'
-    $dialog.Filter = 'SSH private key (no extension)|*'
-    $dialog.OverwritePrompt = $false
-    if ($dialog.ShowDialog() -ne 'OK') { return $null }
-    return Invoke-Ed25519Keygen -KeyPath $dialog.FileName
-}
-
-if ($KeygenSmokeTest) {
-    $testDirectory = Join-Path $env:TEMP ('RedArrow-keygen-smoke-' + [Guid]::NewGuid().ToString('N'))
-    $testKey = Join-Path $testDirectory 'id_ed25519'
-    try {
-        Invoke-Ed25519Keygen -KeyPath $testKey | Out-Null
-        $publicKey = Get-Content -Raw -LiteralPath ($testKey + '.pub')
-        if (-not $publicKey.StartsWith('ssh-ed25519 ')) {
-            throw 'Generated public key is not Ed25519.'
-        }
-        Write-Output "KEYGEN_SMOKE_OK private=$testKey public=$testKey.pub"
-    }
-    finally {
-        Remove-Item -Recurse -Force $testDirectory -ErrorAction SilentlyContinue
-    }
-    if (Test-Path $testDirectory) {
-        throw 'Temporary key-generation directory was not removed.'
-    }
-    exit 0
-}
-
 function Invoke-ControlScript {
     param([string]$ScriptName, [string[]]$Arguments = @(), [switch]$Wait)
     $scriptPath = Join-Path $appDir $ScriptName
@@ -441,20 +362,20 @@ function Invoke-ControlScript {
 }
 
 function Save-Configuration {
-    [int]$sshPort = $sshPortInput.Value
     [int]$socksPort = $socksPortInput.Value
     [int]$httpPort = $httpPortInput.Value
-    $hostValue = $hostInput.Text.Trim()
-    $userValue = $userInput.Text.Trim()
-    $identityValue = $identityInput.Text.Trim()
+    $sshTarget = $sshTargetInput.Text.Trim()
 
-    if ([string]::IsNullOrWhiteSpace($hostValue)) { throw 'SSH host is required.' }
-    if ([string]::IsNullOrWhiteSpace($userValue)) { throw 'SSH user is required.' }
+    if ([string]::IsNullOrWhiteSpace($sshTarget)) { throw 'SSH config target is required.' }
+    if ($sshTarget.StartsWith('-') -or $sshTarget -match '[\r\n]') {
+        throw 'SSH config target is not a valid OpenSSH Host alias.'
+    }
     if ($socksPort -eq $httpPort) { throw 'SOCKS5 and HTTP ports must be different.' }
     Assert-ListenerPortAvailable -Port $socksPort -Label 'SOCKS5'
     Assert-ListenerPortAvailable -Port $httpPort -Label 'HTTP proxy'
-    if ($identityValue -and -not (Test-Path -LiteralPath $identityValue -PathType Leaf)) {
-        throw 'The selected private key does not exist.'
+    $sshConfigPath = Join-Path $env:USERPROFILE '.ssh\config'
+    if (-not (Test-Path -LiteralPath $sshConfigPath -PathType Leaf)) {
+        throw "Windows OpenSSH config not found: $sshConfigPath"
     }
 
     [string[]]$directDomains = ConvertTo-StringArray (Split-Rules $directDomainsInput.Text)
@@ -467,11 +388,7 @@ function Save-Configuration {
     }
 
     $newConfig = [ordered]@{
-        ssh_host = $hostValue
-        ssh_port = $sshPort
-        ssh_user = $userValue
-        identity_file = $identityValue
-        proxy_jump = if ($proxyJumpInput.Text.Trim()) { $proxyJumpInput.Text.Trim() } else { $null }
+        ssh_target = $sshTarget
         socks_bind = '127.0.0.1'
         socks_port = $socksPort
         http_bind = '127.0.0.1'
@@ -617,8 +534,8 @@ function Refresh-Status {
     }
 
     $overviewSystemProxyValue.Text = if ($proxyEnabled) { $proxyAddress } else { 'Off' }
-    $overviewSshValue.Text = if ($hostInput.Text.Trim()) {
-        "$($userInput.Text.Trim())@$($hostInput.Text.Trim()):$([int]$sshPortInput.Value)"
+    $overviewSshValue.Text = if ($sshTargetInput.Text.Trim()) {
+        $sshTargetInput.Text.Trim()
     }
     else {
         'Not configured'
@@ -753,48 +670,28 @@ $overviewApplyButton = New-Button -Parent $overviewTab -Text 'Apply mode and res
 
 # Server tab
 $serverGroup = New-Object System.Windows.Forms.GroupBox
-$serverGroup.Text = 'SSH connection'
+$serverGroup.Text = 'Windows OpenSSH configuration'
 $serverGroup.Location = New-Object System.Drawing.Point(24, 22)
 $serverGroup.Size = New-Object System.Drawing.Size(812, 250)
 $serverTab.Controls.Add($serverGroup)
 
-[void](New-Label -Parent $serverGroup -Text 'Host' -X 24 -Y 36 -Width 120)
-$hostInput = New-TextBox -Parent $serverGroup -X 150 -Y 32 -Width 420 -Text ([string]$config.ssh_host)
-$hostInput.Name = 'sshHostInput'
-[void](New-Label -Parent $serverGroup -Text 'Port' -X 592 -Y 36 -Width 52)
-$sshPortInput = New-Object System.Windows.Forms.NumericUpDown
-$sshPortInput.Location = New-Object System.Drawing.Point(650, 32)
-$sshPortInput.Size = New-Object System.Drawing.Size(120, 28)
-$sshPortInput.Minimum = 1
-$sshPortInput.Maximum = 65535
-$sshPortInput.Value = [int]$config.ssh_port
-$serverGroup.Controls.Add($sshPortInput)
+[void](New-Label -Parent $serverGroup -Text 'SSH Host alias' -X 24 -Y 38 -Width 120)
+$sshTargetInput = New-TextBox -Parent $serverGroup -X 150 -Y 34 -Width 420 -Text ([string]$config.ssh_target)
+$sshTargetInput.Name = 'sshTargetInput'
+$openSshConfigButton = New-Button -Parent $serverGroup -Text 'Open SSH config' -X 592 -Y 31 -Width 178 -Height 32
+$sshConfigDescription = New-Label -Parent $serverGroup -Text 'Uses %USERPROFILE%\.ssh\config. Configure HostName, User, Port, IdentityFile and ProxyJump there.' -X 24 -Y 80 -Width 746 -Height 48 -Color $colors.Muted
 
-[void](New-Label -Parent $serverGroup -Text 'User' -X 24 -Y 82 -Width 120)
-$userInput = New-TextBox -Parent $serverGroup -X 150 -Y 78 -Width 250 -Text ([string]$config.ssh_user)
-$userInput.Name = 'sshUserInput'
-$proxyJumpLabel = New-Label -Parent $serverGroup -Text 'ProxyJump (optional)' -X 424 -Y 82 -Width 142
-$proxyJumpInput = New-TextBox -Parent $serverGroup -X 570 -Y 78 -Width 200 -Text ([string]$config.proxy_jump)
-$proxyJumpToolTip = New-Object System.Windows.Forms.ToolTip
-$proxyJumpToolTip.SetToolTip($proxyJumpInput, 'Leave blank for a direct SSH connection. Example: user@jump-host:port')
-
-[void](New-Label -Parent $serverGroup -Text 'Private key' -X 24 -Y 128 -Width 120)
-$identityInput = New-TextBox -Parent $serverGroup -X 150 -Y 124 -Width 350 -Text ([string]$config.identity_file)
-$generateKeyButton = New-Button -Parent $serverGroup -Text 'Generate' -X 508 -Y 121 -Width 78 -Height 32
-$browseButton = New-Button -Parent $serverGroup -Text 'Browse...' -X 592 -Y 121 -Width 82 -Height 32
-$copyPublicKeyButton = New-Button -Parent $serverGroup -Text 'Copy .pub' -X 680 -Y 121 -Width 90 -Height 32
-
-[void](New-Label -Parent $serverGroup -Text 'SOCKS5 port' -X 24 -Y 176 -Width 120)
+[void](New-Label -Parent $serverGroup -Text 'SOCKS5 port' -X 24 -Y 146 -Width 120)
 $socksPortInput = New-Object System.Windows.Forms.NumericUpDown
-$socksPortInput.Location = New-Object System.Drawing.Point(150, 172)
+$socksPortInput.Location = New-Object System.Drawing.Point(150, 142)
 $socksPortInput.Size = New-Object System.Drawing.Size(120, 28)
 $socksPortInput.Minimum = 1
 $socksPortInput.Maximum = 65535
 $socksPortInput.Value = [int]$config.socks_port
 $serverGroup.Controls.Add($socksPortInput)
-[void](New-Label -Parent $serverGroup -Text 'HTTP port' -X 310 -Y 176 -Width 90)
+[void](New-Label -Parent $serverGroup -Text 'HTTP port' -X 310 -Y 146 -Width 90)
 $httpPortInput = New-Object System.Windows.Forms.NumericUpDown
-$httpPortInput.Location = New-Object System.Drawing.Point(404, 172)
+$httpPortInput.Location = New-Object System.Drawing.Point(404, 142)
 $httpPortInput.Size = New-Object System.Drawing.Size(120, 28)
 $httpPortInput.Minimum = 1
 $httpPortInput.Maximum = 65535
@@ -803,7 +700,7 @@ $serverGroup.Controls.Add($httpPortInput)
 
 $startupCheck = New-Object System.Windows.Forms.CheckBox
 $startupCheck.Text = 'Start Red Arrow when I sign in'
-$startupCheck.Location = New-Object System.Drawing.Point(548, 172)
+$startupCheck.Location = New-Object System.Drawing.Point(548, 142)
 $startupCheck.Size = New-Object System.Drawing.Size(230, 26)
 $startupCheck.Checked = $null -ne (Get-ItemProperty -Path $runKeyPath -Name $runValueName -ErrorAction SilentlyContinue).$runValueName
 $serverGroup.Controls.Add($startupCheck)
@@ -858,56 +755,14 @@ $overviewApplyButton.Add_Click({ Start-Connection })
 $disconnectButton.Add_Click({ Stop-Connection })
 $trayConnect.Add_Click({ Start-Connection })
 $trayDisconnect.Add_Click({ Stop-Connection })
-$browseButton.Add_Click({
-    $dialog = New-Object System.Windows.Forms.OpenFileDialog
-    $dialog.Title = 'Select an OpenSSH private key'
-    $dialog.Filter = 'All files (*.*)|*.*'
-    if ($dialog.ShowDialog() -eq 'OK') { $identityInput.Text = $dialog.FileName }
-})
-$generateKeyButton.Add_Click({
-    try {
-        $keyPath = Generate-Ed25519Key
-        if (-not $keyPath) { return }
-        $identityInput.Text = $keyPath
-        $publicKey = Get-Content -Raw -LiteralPath ($keyPath + '.pub')
-        [System.Windows.Forms.Clipboard]::SetText($publicKey.Trim())
-        [System.Windows.Forms.MessageBox]::Show(
-            "The Ed25519 key pair was generated.`r`n`r`nPrivate key:`r`n$keyPath`r`n`r`nThe public key was copied to the clipboard. Add it to the SSH server's authorized_keys file.",
-            'Red Arrow key generated',
-            'OK',
-            'Information'
-        ) | Out-Null
+$openSshConfigButton.Add_Click({
+    $sshDirectory = Join-Path $env:USERPROFILE '.ssh'
+    $sshConfigPath = Join-Path $sshDirectory 'config'
+    New-Item -ItemType Directory -Force $sshDirectory | Out-Null
+    if (-not (Test-Path -LiteralPath $sshConfigPath)) {
+        New-Item -ItemType File -Path $sshConfigPath | Out-Null
     }
-    catch {
-        [System.Windows.Forms.MessageBox]::Show(
-            $_.Exception.Message,
-            'Cannot generate SSH key',
-            'OK',
-            'Error'
-        ) | Out-Null
-    }
-})
-$copyPublicKeyButton.Add_Click({
-    try {
-        $privatePath = $identityInput.Text.Trim()
-        if (-not $privatePath) { throw 'Select or generate a private key first.' }
-        $publicPath = $privatePath + '.pub'
-        if (-not (Test-Path -LiteralPath $publicPath -PathType Leaf)) {
-            throw "Public key file not found: $publicPath"
-        }
-        $publicKey = Get-Content -Raw -LiteralPath $publicPath
-        [System.Windows.Forms.Clipboard]::SetText($publicKey.Trim())
-        $bottomStatus.Text = 'Public key copied to the clipboard.'
-        $bottomStatus.ForeColor = $colors.Green
-    }
-    catch {
-        [System.Windows.Forms.MessageBox]::Show(
-            $_.Exception.Message,
-            'Cannot copy public key',
-            'OK',
-            'Warning'
-        ) | Out-Null
-    }
+    Start-Process notepad.exe ('"' + $sshConfigPath + '"')
 })
 $serverSaveButton.Add_Click({
     try {
@@ -1031,7 +886,7 @@ $timer.Interval = 1500
 $timer.Add_Tick({ Refresh-Status })
 
 Refresh-Status
-if (-not $hostInput.Text.Trim()) { $tabControl.SelectedTab = $serverTab }
+if (-not $sshTargetInput.Text.Trim()) { $tabControl.SelectedTab = $serverTab }
 
 if ($SmokeTest -or $ScreenshotPath) {
     $requiredControls = @(
@@ -1039,23 +894,15 @@ if ($SmokeTest -or $ScreenshotPath) {
         $connectButton,
         $disconnectButton,
         $tabControl,
-        $hostInput,
-        $userInput,
-        $identityInput,
-        $proxyJumpLabel,
-        $generateKeyButton,
-        $browseButton,
-        $copyPublicKeyButton,
+        $sshTargetInput,
+        $openSshConfigButton,
         $directDomainsInput,
         $logBox
     )
     if ($requiredControls -contains $null) { throw 'A required UI control was not created.' }
-    if ($hostInput.Text -or $userInput.Text) { throw 'Private server defaults are present in the UI.' }
+    if ($sshTargetInput.Text) { throw 'A private SSH target default is present in the UI.' }
     if ([int]$socksPortInput.Value -ne 1080 -or [int]$httpPortInput.Value -ne 8118) {
         throw 'Unexpected default proxy ports.'
-    }
-    if ($proxyJumpLabel.Text -notmatch 'optional' -or -not $proxyJumpToolTip.GetToolTip($proxyJumpInput)) {
-        throw 'ProxyJump is not clearly marked as optional.'
     }
     if ($tabControl.TabPages.Count -ne 4) { throw 'Unexpected tab count.' }
     $tabControl.SelectedTab = switch ($ScreenshotTab) {

@@ -32,14 +32,11 @@ try {
     }
 
     $example = Get-Content -Raw (Join-Path $auditDir 'config.example.json') | ConvertFrom-Json
-    if ($example.ssh_host -ne 'ssh.example.com' -or $example.ssh_user -ne 'username') {
+    if ($example.ssh_target -ne 'red-arrow-tunnel') {
         throw 'Portable example configuration is not generic.'
     }
     if ($example.socks_port -ne 1080 -or $example.http_port -ne 8118) {
         throw 'Portable example proxy ports do not match 1080/8118.'
-    }
-    if ($null -ne $example.proxy_jump) {
-        throw 'ProxyJump must be optional and null by default.'
     }
 
     & (Join-Path $auditDir 'RedArrow.exe') `
@@ -52,10 +49,6 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable control-center smoke test failed.'
     }
-    & (Join-Path $auditDir 'control-center.ps1') -KeygenSmokeTest
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Portable Ed25519 key-generation smoke test failed.'
-    }
     & (Join-Path $auditDir 'control-center.ps1') -ConfigSerializationSmokeTest
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable config-serialization smoke test failed.'
@@ -65,7 +58,7 @@ try {
         throw 'Portable candidate-config round-trip smoke test failed.'
     }
 
-    $forbiddenPatterns = @('root@', '"ssh_user": "root"', 'Latex Tools SSH Proxy')
+    $forbiddenPatterns = @('root@', '"ssh_user"', '"identity_file"', 'Latex Tools SSH Proxy')
     foreach ($pattern in $forbiddenPatterns) {
         $matches = Get-ChildItem -Recurse -File $auditDir |
             Select-String -SimpleMatch $pattern -ErrorAction SilentlyContinue
@@ -73,7 +66,7 @@ try {
             throw "Portable package contains forbidden private/stale value: $pattern"
         }
     }
-    Write-Output 'PORTABLE_SMOKE_OK socks=1080 http=8118 proxyJump=null keygen=ed25519'
+    Write-Output 'PORTABLE_SMOKE_OK socks=1080 http=8118 sshTarget=red-arrow-tunnel'
 }
 finally {
     Remove-Item -Recurse -Force $auditDir -ErrorAction SilentlyContinue

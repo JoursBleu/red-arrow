@@ -1,9 +1,5 @@
 {
-  "ssh_host": "ssh.example.com",
-  "ssh_port": 22,
-  "ssh_user": "username",
-  "identity_file": "",
-  "proxy_jump": null,
+  "ssh_target": "red-arrow-tunnel",
   "socks_bind": "127.0.0.1",
   "socks_port": 1080,
   "http_bind": "127.0.0.1",

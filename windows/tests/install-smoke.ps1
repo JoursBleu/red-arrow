@@ -67,7 +67,8 @@ try {
 
     $forbiddenPatterns = @(
         'root@',
-        '"ssh_user": "root"',
+        '"ssh_user"',
+        '"identity_file"',
         'Latex Tools SSH Proxy'
     )
     foreach ($pattern in $forbiddenPatterns) {
@@ -103,16 +104,12 @@ try {
     }
 
     $example = Get-Content -Raw (Join-Path $testDir 'config.example.json') | ConvertFrom-Json
-    if ($example.ssh_host -ne 'ssh.example.com' -or $example.ssh_user -ne 'username') {
+    if ($example.ssh_target -ne 'red-arrow-tunnel') {
         throw 'Installed example configuration is not generic.'
     }
     & (Join-Path $testDir 'control-center.ps1') -SmokeTest
     if ($LASTEXITCODE -ne 0) {
         throw 'Installed control center smoke test failed.'
-    }
-    & (Join-Path $testDir 'control-center.ps1') -KeygenSmokeTest
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Installed Ed25519 key-generation smoke test failed.'
     }
     & (Join-Path $testDir 'control-center.ps1') -ConfigSerializationSmokeTest
     if ($LASTEXITCODE -ne 0) {

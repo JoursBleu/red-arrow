@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer};
 use std::env;
+use std::ffi::OsString;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
@@ -24,11 +25,7 @@ enum SystemProxyMode {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default)]
 struct Config {
-    ssh_host: String,
-    ssh_port: u16,
-    ssh_user: String,
-    identity_file: String,
-    proxy_jump: Option<String>,
+    ssh_target: String,
     socks_bind: String,
     socks_port: u16,
     http_bind: String,
@@ -75,11 +72,7 @@ where
 impl Default for Config {
     fn default() -> Self {
         Self {
-            ssh_host: String::new(),
-            ssh_port: 22,
-            ssh_user: String::new(),
-            identity_file: String::new(),
-            proxy_jump: None,
+            ssh_target: String::new(),
             socks_bind: "127.0.0.1".to_owned(),
             socks_port: 1080,
             http_bind: "127.0.0.1".to_owned(),
@@ -223,19 +216,23 @@ impl Config {
     fn load(path: &Path) -> Result<Self, String> {
         let content = fs::read_to_string(path)
             .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
-        let mut config: Self = serde_json::from_str(content.trim_start_matches('\u{feff}'))
+        let config: Self = serde_json::from_str(content.trim_start_matches('\u{feff}'))
             .map_err(|error| format!("invalid JSON in {}: {error}", path.display()))?;
-        config.identity_file = expand_environment(&config.identity_file);
+        let mut config = config;
         config.log_file = expand_environment(&config.log_file);
         config.validate()?;
         Ok(config)
     }
 
     fn validate(&self) -> Result<(), String> {
-        if self.ssh_host.trim().is_empty() || self.ssh_user.trim().is_empty() {
-            return Err("ssh_host and ssh_user must not be empty".to_owned());
+        let ssh_target = self.ssh_target.trim();
+        if ssh_target.is_empty() {
+            return Err("ssh_target must not be empty".to_owned());
         }
-        if self.ssh_port == 0 || self.socks_port == 0 || self.http_port == 0 {
+        if ssh_target.starts_with('-') || ssh_target.contains(['\r', '\n', '\0']) {
+            return Err("ssh_target is not a valid OpenSSH Host alias".to_owned());
+        }
+        if self.socks_port == 0 || self.http_port == 0 {
             return Err("ports must be between 1 and 65535".to_owned());
         }
         let socks_bind = self
@@ -251,12 +248,6 @@ impl Config {
         }
         if self.socks_bind == self.http_bind && self.socks_port == self.http_port {
             return Err("SOCKS and HTTP listeners cannot use the same address and port".to_owned());
-        }
-        if !self.identity_file.is_empty() && !Path::new(&self.identity_file).is_file() {
-            return Err(format!(
-                "SSH identity file does not exist: {}",
-                self.identity_file
-            ));
         }
         Ok(())
     }
@@ -334,6 +325,46 @@ fn default_config_path() -> PathBuf {
     Path::new(&base).join("RedArrow").join("config.json")
 }
 
+fn windows_openssh_path() -> PathBuf {
+    let windows = env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".to_owned());
+    Path::new(&windows)
+        .join("System32")
+        .join("OpenSSH")
+        .join("ssh.exe")
+}
+
+fn user_ssh_config_path() -> PathBuf {
+    let profile = env::var("USERPROFILE").unwrap_or_else(|_| ".".to_owned());
+    Path::new(&profile).join(".ssh").join("config")
+}
+
+fn ssh_arguments(config: &Config, ssh_config: &Path) -> Vec<OsString> {
+    [
+        OsString::from("-F"),
+        ssh_config.as_os_str().to_owned(),
+        OsString::from("-N"),
+        OsString::from("-T"),
+        OsString::from("-D"),
+        OsString::from(config.socks_address()),
+        OsString::from("-o"),
+        OsString::from("BatchMode=yes"),
+        OsString::from("-o"),
+        OsString::from("ExitOnForwardFailure=yes"),
+        OsString::from("-o"),
+        OsString::from(format!("ConnectTimeout={}", config.connect_timeout_seconds)),
+        OsString::from("-o"),
+        OsString::from(format!(
+            "ServerAliveInterval={}",
+            config.server_alive_interval_seconds
+        )),
+        OsString::from("-o"),
+        OsString::from("ServerAliveCountMax=3"),
+        OsString::from(config.ssh_target.trim()),
+    ]
+    .into_iter()
+    .collect()
+}
+
 fn parse_arguments() -> Result<(PathBuf, bool), String> {
     let mut arguments = env::args().skip(1);
     let mut config_path = default_config_path();
@@ -366,45 +397,27 @@ fn parse_arguments() -> Result<(PathBuf, bool), String> {
 }
 
 fn spawn_ssh(config: &Config, logger: &Logger) -> io::Result<Child> {
-    let mut command = Command::new("ssh.exe");
-    command
-        .arg("-N")
-        .arg("-T")
-        .arg("-D")
-        .arg(config.socks_address())
-        .arg("-p")
-        .arg(config.ssh_port.to_string())
-        .arg("-o")
-        .arg("BatchMode=yes")
-        .arg("-o")
-        .arg("ExitOnForwardFailure=yes")
-        .arg("-o")
-        .arg(format!("ConnectTimeout={}", config.connect_timeout_seconds))
-        .arg("-o")
-        .arg(format!(
-            "ServerAliveInterval={}",
-            config.server_alive_interval_seconds
-        ))
-        .arg("-o")
-        .arg("ServerAliveCountMax=3")
-        .arg("-o")
-        .arg("StrictHostKeyChecking=accept-new")
-        .arg("-o")
-        .arg("IdentitiesOnly=yes");
+    let ssh_executable = windows_openssh_path();
+    let ssh_config = user_ssh_config_path();
+    if !ssh_executable.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "Windows OpenSSH Client was not found at {}",
+                ssh_executable.display()
+            ),
+        ));
+    }
+    if !ssh_config.is_file() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("user SSH config was not found at {}", ssh_config.display()),
+        ));
+    }
 
-    if !config.identity_file.is_empty() {
-        command.arg("-i").arg(&config.identity_file);
-    }
-    if let Some(proxy_jump) = config
-        .proxy_jump
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        command.arg("-J").arg(proxy_jump);
-    }
+    let mut command = Command::new(&ssh_executable);
     command
-        .arg(format!("{}@{}", config.ssh_user, config.ssh_host))
+        .args(ssh_arguments(config, &ssh_config))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -412,11 +425,10 @@ fn spawn_ssh(config: &Config, logger: &Logger) -> io::Result<Child> {
     logger.log(
         "INFO",
         format!(
-            "starting SSH tunnel {} -> {}@{}:{}",
+            "starting SSH tunnel {} using target {:?} from {}",
             config.socks_address(),
-            config.ssh_user,
-            config.ssh_host,
-            config.ssh_port
+            config.ssh_target.trim(),
+            ssh_config.display()
         ),
     );
     command.spawn()
@@ -895,17 +907,42 @@ mod tests {
     }
 
     #[test]
+    fn ssh_uses_only_the_user_config_target() {
+        let config = Config {
+            ssh_target: "red-arrow-tunnel".to_owned(),
+            ..Config::default()
+        };
+        let arguments = ssh_arguments(&config, Path::new(r"C:\Users\test\.ssh\config"));
+        let rendered = arguments
+            .iter()
+            .map(|value| value.to_string_lossy())
+            .collect::<Vec<_>>();
+        assert!(rendered
+            .windows(2)
+            .any(|pair| pair == ["-F", r"C:\Users\test\.ssh\config"]));
+        assert_eq!(rendered.last().map(AsRef::as_ref), Some("red-arrow-tunnel"));
+        for forbidden in [
+            "-p",
+            "-i",
+            "-J",
+            "IdentitiesOnly=yes",
+            "StrictHostKeyChecking=accept-new",
+        ] {
+            assert!(!rendered.contains(&forbidden.into()));
+        }
+    }
+
+    #[test]
     fn accepts_utf8_bom_configuration() {
-        let json = "\u{feff}{\"ssh_host\":\"example.com\"}";
+        let json = "\u{feff}{\"ssh_target\":\"red-arrow-tunnel\"}";
         let config: Config = serde_json::from_str(json.trim_start_matches('\u{feff}')).unwrap();
-        assert_eq!(config.ssh_host, "example.com");
+        assert_eq!(config.ssh_target, "red-arrow-tunnel");
     }
 
     #[test]
     fn accepts_legacy_powershell_rule_shapes() {
         let json = r#"{
-            "ssh_host": "example.com",
-            "ssh_user": "user",
+            "ssh_target": "red-arrow-tunnel",
             "direct_domains": ".cn",
             "direct_cidrs": {},
             "force_proxy_domains": {}

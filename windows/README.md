@@ -44,7 +44,8 @@ Arrow is stopped, uninstalled, or exits unexpectedly.
 1. Run `RedArrow-Windows-Setup-1.2.2-x64.exe`.
 2. Approve the UAC prompt.
 3. Select **Open Red Arrow** when setup completes.
-4. Enter the SSH host, user, and authorized private key.
+4. Configure a `Host` in `%USERPROFILE%\.ssh\config`, then enter that alias in
+  the Server tab.
 5. Choose a system proxy mode. **Bypass mainland China** is the default.
 
 The application is installed in:
@@ -67,17 +68,23 @@ disconnect commands, mode switching, SSH settings, routing rules, live logs,
 proxy testing, and start-at-sign-in. Minimizing it sends it to the notification
 area while the proxy continues running.
 
+Red Arrow uses `%WINDIR%\System32\OpenSSH\ssh.exe` and explicitly loads the
+signed-in user's `%USERPROFILE%\.ssh\config`. It stores only the selected `Host`
+alias. `HostName`, `User`, `Port`, `IdentityFile`, `ProxyJump`, host-key policy,
+and other connection settings remain owned by Windows OpenSSH. For example:
+
+```sshconfig
+Host red-arrow-tunnel
+  HostName ssh.example.com
+  User username
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+  # ProxyJump user@jump-host
+```
+
 The SSH command uses `BatchMode=yes`. A passphrase-protected key must already be
 loaded into Windows `ssh-agent`; a dedicated unencrypted tunnel key works without
 an agent.
-
-`ProxyJump` is optional. Leave it blank for a direct SSH connection, or enter an
-OpenSSH jump specification such as `user@jump-host:port`.
-
-The Server tab can generate a dedicated Ed25519 key pair using Windows
-`ssh-keygen`. Red Arrow refuses to overwrite existing key files, stores the key
-at the location selected by the user, and copies the new public key to the
-clipboard for installation in the server's `authorized_keys` file.
 
 The default ports are SOCKS5 `1080` and HTTP `8118`. IANA registers `1080` for
 SOCKS and `8118` for HTTP proxy use. Port `1081` is assigned to another service

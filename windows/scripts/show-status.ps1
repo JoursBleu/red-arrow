@@ -17,7 +17,7 @@ Write-Host ('Application: {0}' -f $(if ($app) { 'running' } else { 'stopped' }))
 Write-Host ('SSH tunnel:  {0}' -f $(if ($ssh) { 'running' } else { 'stopped' }))
 Write-Host "SOCKS5:      $($config.socks_bind):$($config.socks_port)"
 Write-Host "HTTP proxy:  $($config.http_bind):$($config.http_port)"
-Write-Host "SSH target:  $($config.ssh_user)@$($config.ssh_host):$($config.ssh_port)"
+Write-Host "SSH target:  $($config.ssh_target) (from $env:USERPROFILE\.ssh\config)"
 $modeName = switch ([string]$config.system_proxy_mode) {
     'global' { 'Global proxy' }
     'bypass_cn' { 'Bypass mainland China' }

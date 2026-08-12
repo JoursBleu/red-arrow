@@ -1,12 +1,7 @@
 param(
     [string]$Root = (Join-Path $PSScriptRoot '..'),
     [Parameter(Mandatory = $true)]
-    [string]$SshHost,
-    [int]$SshPort = 22,
-    [Parameter(Mandatory = $true)]
-    [string]$SshUser,
-    [Parameter(Mandatory = $true)]
-    [string]$IdentityFile,
+    [string]$SshTarget,
     [int]$SocksPort = 22080,
     [int]$HttpPort = 22118,
     [Parameter(Mandatory = $true)]
@@ -108,11 +103,7 @@ function Run-Mode {
     $configPath = Join-Path $tempDir "config-$Mode.json"
     $logPath = Join-Path $tempDir "proxy-$Mode.log"
     $config = [ordered]@{
-        ssh_host = $SshHost
-        ssh_port = $SshPort
-        ssh_user = $SshUser
-        identity_file = $IdentityFile
-        proxy_jump = $null
+        ssh_target = $SshTarget
         socks_bind = '127.0.0.1'
         socks_port = $SocksPort
         http_bind = '127.0.0.1'
