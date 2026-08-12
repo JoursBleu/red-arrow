@@ -47,6 +47,7 @@ Source: "rules\LICENSE"; DestDir: "{app}\rules"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Red Arrow"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\control-center.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\red-arrow.ico"
+Name: "{autodesktop}\Red Arrow"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\control-center.ps1"""; WorkingDir: "{app}"; IconFilename: "{app}\red-arrow.ico"
 Name: "{group}\Start proxy in background"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\start-hidden.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\red-arrow.ico"
 Name: "{group}\Stop proxy"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\stop-proxy.ps1"""; WorkingDir: "{app}"
 Name: "{group}\Proxy status"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\show-status.ps1"""; WorkingDir: "{app}"

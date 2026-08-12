@@ -53,6 +53,8 @@ The application is installed in:
 C:\Program Files\Red Arrow
 ```
 
+Setup creates Red Arrow shortcuts on the desktop and in the Start menu.
+
 Writable configuration and logs stay in the signed-in user's profile:
 
 ```text
