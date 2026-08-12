@@ -414,13 +414,18 @@ function Invoke-ControlScript {
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
         '-WindowStyle', 'Hidden',
-        '-File', ('"' + $scriptPath + '"')
+        '-File', $scriptPath
     ) + $Arguments
-    $process = Start-Process `
-        -FilePath $powershellExe `
-        -ArgumentList $argumentList `
-        -WindowStyle Hidden `
-        -PassThru
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $powershellExe
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $startInfo.Arguments = (($argumentList | ForEach-Object {
+        '"' + ([string]$_).Replace('"', '\"') + '"'
+    }) -join ' ')
+    $process = [System.Diagnostics.Process]::Start($startInfo)
     if ($Wait) { $process.WaitForExit() }
     return $process
 }
