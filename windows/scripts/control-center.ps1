@@ -1,5 +1,6 @@
 param(
     [switch]$SmokeTest,
+    [switch]$SshConfigParsingSmokeTest,
     [switch]$ConfigSerializationSmokeTest,
     [switch]$ConfigRoundTripSmokeTest,
     [string]$ScreenshotPath,
@@ -62,6 +63,115 @@ $defaults = [ordered]@{
     direct_domains = @('.cn')
     direct_cidrs = @()
     force_proxy_domains = @()
+}
+
+function Split-SshConfigArguments {
+    param([string]$Value)
+
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in [regex]::Matches($Value, '#.*$|"(?:\\.|[^"\\])*"|''[^'']*''|[^\s#]+')) {
+        $argument = $match.Value
+        if ($argument.StartsWith('#')) { break }
+        if (($argument.StartsWith('"') -and $argument.EndsWith('"')) -or
+            ($argument.StartsWith("'") -and $argument.EndsWith("'"))) {
+            $argument = $argument.Substring(1, $argument.Length - 2)
+        }
+        if ($argument) { $arguments.Add($argument) }
+    }
+    return @($arguments)
+}
+
+function Resolve-SshIncludePaths {
+    param([string]$Pattern, [string]$BaseDirectory)
+
+    if ($Pattern -eq '~') {
+        $Pattern = $env:USERPROFILE
+    }
+    elseif ($Pattern.StartsWith('~/') -or $Pattern.StartsWith('~\')) {
+        $Pattern = Join-Path $env:USERPROFILE $Pattern.Substring(2)
+    }
+    elseif (-not [System.IO.Path]::IsPathRooted($Pattern)) {
+        $Pattern = Join-Path $BaseDirectory $Pattern
+    }
+    return @(Get-ChildItem -Path $Pattern -File -ErrorAction SilentlyContinue |
+        Sort-Object FullName |
+        ForEach-Object { $_.FullName })
+}
+
+function Get-SshHostAliases {
+    param(
+        [string]$Path = (Join-Path $env:USERPROFILE '.ssh\config'),
+        [System.Collections.Generic.HashSet[string]]$Visited,
+        [System.Collections.Generic.HashSet[string]]$SeenAliases,
+        [int]$Depth = 0
+    )
+
+    if ($Depth -gt 16 -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return @() }
+    if (-not $Visited) {
+        $Visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    }
+    if (-not $SeenAliases) {
+        $SeenAliases = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    }
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    if (-not $Visited.Add($fullPath)) { return @() }
+
+    $aliases = [System.Collections.Generic.List[string]]::new()
+    $baseDirectory = Split-Path -Parent $fullPath
+    foreach ($line in Get-Content -LiteralPath $fullPath -ErrorAction Stop) {
+        if ($line -notmatch '^\s*(Host|Include)\s*(?:=)?\s*(.*?)\s*$') { continue }
+        $keyword = $matches[1]
+        $arguments = @(Split-SshConfigArguments -Value $matches[2])
+        if ($keyword -ieq 'Host') {
+            foreach ($alias in $arguments) {
+                if (-not $alias.StartsWith('!') -and $alias.IndexOfAny([char[]]'*?') -lt 0 -and $SeenAliases.Add($alias)) {
+                    $aliases.Add($alias)
+                }
+            }
+        }
+        else {
+            foreach ($include in $arguments) {
+                foreach ($includePath in Resolve-SshIncludePaths -Pattern $include -BaseDirectory $baseDirectory) {
+                    foreach ($alias in Get-SshHostAliases -Path $includePath -Visited $Visited -SeenAliases $SeenAliases -Depth ($Depth + 1)) {
+                        $aliases.Add($alias)
+                    }
+                }
+            }
+        }
+    }
+    return @($aliases)
+}
+
+if ($SshConfigParsingSmokeTest) {
+    $testDirectory = Join-Path $env:TEMP ('RedArrow-ssh-config-smoke-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        $includeDirectory = Join-Path $testDirectory 'conf.d'
+        New-Item -ItemType Directory -Force $includeDirectory | Out-Null
+        @'
+# Host ignored-comment
+Host alpha beta # two aliases
+host Gamma
+Host *.example.com !blocked exact-host
+Host duplicate
+Host DUPLICATE
+Include conf.d/*.conf
+'@ | Set-Content -Encoding ASCII (Join-Path $testDirectory 'config')
+        @'
+Host included-one included-two
+Host ?
+Include ../config
+'@ | Set-Content -Encoding ASCII (Join-Path $includeDirectory 'hosts.conf')
+        $actual = @(Get-SshHostAliases -Path (Join-Path $testDirectory 'config'))
+        $expected = @('alpha', 'beta', 'Gamma', 'exact-host', 'duplicate', 'included-one', 'included-two')
+        if (($actual -join '|') -ne ($expected -join '|')) {
+            throw "SSH config parsing mismatch. Expected $($expected -join ', '); got $($actual -join ', ')"
+        }
+        Write-Output "SSH_CONFIG_PARSING_SMOKE_OK aliases=$($actual.Count)"
+    }
+    finally {
+        Remove-Item -Recurse -Force $testDirectory -ErrorAction SilentlyContinue
+    }
+    exit 0
 }
 
 function Load-Configuration {
@@ -676,8 +786,13 @@ $serverGroup.Size = New-Object System.Drawing.Size(812, 250)
 $serverTab.Controls.Add($serverGroup)
 
 [void](New-Label -Parent $serverGroup -Text 'SSH Host alias' -X 24 -Y 38 -Width 120)
-$sshTargetInput = New-TextBox -Parent $serverGroup -X 150 -Y 34 -Width 420 -Text ([string]$config.ssh_target)
+$sshTargetInput = New-Object System.Windows.Forms.ComboBox
 $sshTargetInput.Name = 'sshTargetInput'
+$sshTargetInput.DropDownStyle = 'DropDownList'
+$sshTargetInput.Location = New-Object System.Drawing.Point(150, 34)
+$sshTargetInput.Size = New-Object System.Drawing.Size(318, 28)
+$serverGroup.Controls.Add($sshTargetInput)
+$refreshSshHostsButton = New-Button -Parent $serverGroup -Text 'Refresh' -X 476 -Y 31 -Width 94 -Height 32
 $openSshConfigButton = New-Button -Parent $serverGroup -Text 'Open SSH config' -X 592 -Y 31 -Width 178 -Height 32
 $sshConfigDescription = New-Label -Parent $serverGroup -Text 'Uses %USERPROFILE%\.ssh\config. Configure HostName, User, Port, IdentityFile and ProxyJump there.' -X 24 -Y 80 -Width 746 -Height 48 -Color $colors.Muted
 
@@ -707,6 +822,32 @@ $serverGroup.Controls.Add($startupCheck)
 
 $serverSaveButton = New-Button -Parent $serverTab -Text 'Save settings' -X 690 -Y 294 -Width 146 -BackColor $colors.Red -ForeColor ([System.Drawing.Color]::White)
 $serverStatus = New-Label -Parent $serverTab -Text '' -X 24 -Y 302 -Width 620 -Height 28 -Color $colors.Green
+
+function Update-SshTargetList {
+    param([string]$PreferredTarget)
+
+    $aliases = if ($SmokeTest) { @() } else { @(Get-SshHostAliases) }
+    $sshTargetInput.Items.Clear()
+    foreach ($alias in $aliases) { [void]$sshTargetInput.Items.Add($alias) }
+    if ($PreferredTarget -and -not $sshTargetInput.Items.Contains($PreferredTarget)) {
+        [void]$sshTargetInput.Items.Insert(0, $PreferredTarget)
+    }
+    if ($PreferredTarget) {
+        $sshTargetInput.SelectedItem = $PreferredTarget
+    }
+    elseif ($sshTargetInput.Items.Count -gt 0) {
+        $sshTargetInput.SelectedIndex = 0
+    }
+    $serverStatus.Text = if ($aliases.Count) {
+        "Loaded $($aliases.Count) SSH Host aliases from %USERPROFILE%\.ssh\config."
+    }
+    else {
+        'No concrete SSH Host aliases found. Add one to %USERPROFILE%\.ssh\config and refresh.'
+    }
+    $serverStatus.ForeColor = if ($aliases.Count) { $colors.Green } else { $colors.Muted }
+}
+
+Update-SshTargetList -PreferredTarget ([string]$config.ssh_target)
 
 # Routing tab
 [void](New-Label -Parent $routingTab -Text 'Always direct domains' -X 24 -Y 28 -Width 220 -Font $subheadingFont)
@@ -755,6 +896,15 @@ $overviewApplyButton.Add_Click({ Start-Connection })
 $disconnectButton.Add_Click({ Stop-Connection })
 $trayConnect.Add_Click({ Start-Connection })
 $trayDisconnect.Add_Click({ Stop-Connection })
+$refreshSshHostsButton.Add_Click({
+    try {
+        Update-SshTargetList -PreferredTarget $sshTargetInput.Text.Trim()
+    }
+    catch {
+        $serverStatus.Text = "Cannot read SSH config: $($_.Exception.Message)"
+        $serverStatus.ForeColor = $colors.RedDark
+    }
+})
 $openSshConfigButton.Add_Click({
     $sshDirectory = Join-Path $env:USERPROFILE '.ssh'
     $sshConfigPath = Join-Path $sshDirectory 'config'
@@ -895,12 +1045,14 @@ if ($SmokeTest -or $ScreenshotPath) {
         $disconnectButton,
         $tabControl,
         $sshTargetInput,
+        $refreshSshHostsButton,
         $openSshConfigButton,
         $directDomainsInput,
         $logBox
     )
     if ($requiredControls -contains $null) { throw 'A required UI control was not created.' }
     if ($sshTargetInput.Text) { throw 'A private SSH target default is present in the UI.' }
+    if ($sshTargetInput.DropDownStyle -ne 'DropDownList') { throw 'SSH target must be selected from a list.' }
     if ([int]$socksPortInput.Value -ne 1080 -or [int]$httpPortInput.Value -ne 8118) {
         throw 'Unexpected default proxy ports.'
     }

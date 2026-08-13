@@ -49,6 +49,10 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable control-center smoke test failed.'
     }
+    & (Join-Path $auditDir 'control-center.ps1') -SshConfigParsingSmokeTest
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Portable SSH config parsing smoke test failed.'
+    }
     & (Join-Path $auditDir 'control-center.ps1') -ConfigSerializationSmokeTest
     if ($LASTEXITCODE -ne 0) {
         throw 'Portable config-serialization smoke test failed.'

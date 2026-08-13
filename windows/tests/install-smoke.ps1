@@ -111,6 +111,10 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw 'Installed control center smoke test failed.'
     }
+    & (Join-Path $testDir 'control-center.ps1') -SshConfigParsingSmokeTest
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Installed SSH config parsing smoke test failed.'
+    }
     & (Join-Path $testDir 'control-center.ps1') -ConfigSerializationSmokeTest
     if ($LASTEXITCODE -ne 0) {
         throw 'Installed config-serialization smoke test failed.'
